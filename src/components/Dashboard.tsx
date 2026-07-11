@@ -18,15 +18,12 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
-  TrendingUp,
-  TrendingDown,
   Info,
   Upload,
   ClipboardPaste,
   Save,
   FolderOpen,
 } from 'lucide-react';
-import { formatINR } from '@/lib/taxEngine';
 
 type InputMode = 'upload' | 'paste';
 
@@ -63,12 +60,10 @@ export function Dashboard() {
   const makeEmptyResult = (errors: string[]): ProcessingResult => ({
     transactions: [],
     overallSummary: {
-      totalPurchaseValue: 0,
-      totalSaleValue: 0,
-      totalSellExpenses: 0,
-      intradayGain: 0,
-      stcgGain: 0,
-      ltcgGain: 0,
+      intraday: { purchaseValue: 0, saleValue: 0, sellExpenses: 0, gain: 0 },
+      stcg: { purchaseValue: 0, saleValue: 0, sellExpenses: 0, gain: 0 },
+      ltcg: { purchaseValue: 0, saleValue: 0, sellExpenses: 0, gain: 0 },
+      total: { purchaseValue: 0, saleValue: 0, sellExpenses: 0, gain: 0 },
     },
     periodAggregates: [],
     setOffResults: [],
