@@ -85,16 +85,14 @@ export function autoMapColumns(
       'purchase_value', 'purchasevalue', 'purchase value', 'buy_value',
       'buyvalue', 'buy value', 'cost_of_acquisition', 'purchase_amount',
       'buy_amount', 'cost', 'buy amt', 'buy_amt', 'purchase amt',
-      'purchase_amt', 'cost of acquisition', 'buy price', 'buy_price',
-      'purchase price', 'purchase_price', 'bought value', 'bought_value',
+      'purchase_amt', 'cost of acquisition', 'bought value', 'bought_value',
       'acquisition value', 'acquisition_value', 'total buy', 'total_buy',
     ],
     saleValue: [
       'sale_value', 'salevalue', 'sale value', 'sell_value', 'sellvalue',
       'sell value', 'sale_amount', 'sell_amount', 'sale_consideration',
       'sell amt', 'sell_amt', 'sale amt', 'sale_amt', 'consideration',
-      'sell price', 'sell_price', 'sale price', 'sale_price', 'sold value',
-      'sold_value', 'total sell', 'total_sell', 'sale consideration',
+      'sold value', 'sold_value', 'total sell', 'total_sell', 'sale consideration',
     ],
     purchaseExpenses: [
       'purchase_expenses', 'purchaseexpenses', 'purchase expenses',
