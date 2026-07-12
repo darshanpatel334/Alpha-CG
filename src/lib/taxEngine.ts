@@ -76,6 +76,22 @@ export interface OverallSummary {
   total: CategorySummary;
 }
 
+export interface DatasetInput {
+  id: number;
+  sourceName: string;
+  rows: Record<string, unknown>[];
+}
+
+export interface DatasetInfo {
+  id: number;
+  sourceName: string;
+  chargesDetected: boolean;
+  totalSTT: number;
+  totalChargesDeducted: number;
+  totalTransactions: number;
+  overallSummary: OverallSummary;
+}
+
 export interface ProcessingResult {
   transactions: ClassifiedTransaction[];
   overallSummary: OverallSummary;
@@ -87,12 +103,12 @@ export interface ProcessingResult {
   totalTransactions: number;
   fiscalYear: string;
   parseErrors: string[];
-  /** Whether per-transaction charge columns were detected (e.g. Zerodha) */
-  chargesDetected: boolean;
-  /** Total non-STT charges deducted from gains */
+  /** Total non-STT charges deducted from gains across all datasets */
   totalChargesDeducted: number;
-  /** Total STT detected (not deducted — shown for info only) */
+  /** Total STT detected across all datasets (shown for info only) */
   totalSTT: number;
+  /** Per-dataset statistics and charge information */
+  datasets: DatasetInfo[];
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -610,17 +626,9 @@ export function distributeLumpSumCharges(
  * Full processing pipeline: parse → classify → aggregate → set-off.
  */
 export function processTransactions(
-  rows: Record<string, unknown>[],
+  inputs: DatasetInput[],
   holdingThreshold: number = DEFAULT_HOLDING_THRESHOLD
 ): ProcessingResult {
-  // Step 1: Parse
-  const {
-    transactions: rawTxns,
-    errors: parseErrors,
-    chargesDetected,
-    totalSTT,
-    totalChargesFromColumns,
-  } = parseTransactions(rows);
 
   const emptyCat = (): CategorySummary => ({
     purchaseValue: 0,
@@ -629,6 +637,71 @@ export function processTransactions(
     gain: 0,
   });
 
+  let allRawTxns: RawTransaction[] = [];
+  let allParseErrors: string[] = [];
+  let globalTotalSTT = 0;
+  let globalTotalChargesDeducted = 0;
+  const datasetsInfo: DatasetInfo[] = [];
+
+  // Step 1: Parse and summarize each dataset individually
+  for (const input of inputs) {
+    const {
+      transactions: rawTxns,
+      errors: parseErrors,
+      chargesDetected,
+      totalSTT,
+      totalChargesFromColumns,
+    } = parseTransactions(input.rows);
+
+    allRawTxns = allRawTxns.concat(rawTxns);
+    if (parseErrors.length > 0) {
+      // Prefix errors with source name for clarity
+      allParseErrors = allParseErrors.concat(parseErrors.map(e => `[${input.sourceName}] ${e}`));
+    }
+
+    const classified = rawTxns.map((tx) => classifyTransaction(tx, holdingThreshold));
+    const dsSummary: OverallSummary = {
+      intraday: emptyCat(), stcg: emptyCat(), ltcg: emptyCat(), total: emptyCat(),
+    };
+    let dsTotalChargesDeducted = 0;
+
+    for (const tx of classified) {
+      let cat: CategorySummary;
+      if (tx.gainType === 'INTRADAY') cat = dsSummary.intraday;
+      else if (tx.gainType === 'STCG') cat = dsSummary.stcg;
+      else cat = dsSummary.ltcg;
+
+      cat.purchaseValue += tx.totalPurchase;
+      cat.saleValue += tx.saleValue;
+      cat.sellExpenses += tx.transferExpenses;
+      cat.gain += tx.capitalGain;
+
+      dsSummary.total.purchaseValue += tx.totalPurchase;
+      dsSummary.total.saleValue += tx.saleValue;
+      dsSummary.total.sellExpenses += tx.transferExpenses;
+      dsSummary.total.gain += tx.capitalGain;
+
+      dsTotalChargesDeducted += tx.transferExpenses + tx.purchaseExpenses;
+    }
+
+    if (chargesDetected && totalChargesFromColumns > 0) {
+      dsTotalChargesDeducted = totalChargesFromColumns;
+    }
+
+    datasetsInfo.push({
+      id: input.id,
+      sourceName: input.sourceName,
+      chargesDetected,
+      totalSTT,
+      totalChargesDeducted: dsTotalChargesDeducted,
+      totalTransactions: classified.length,
+      overallSummary: dsSummary,
+    });
+
+    globalTotalSTT += totalSTT;
+    globalTotalChargesDeducted += dsTotalChargesDeducted;
+  }
+
   const emptyOverallSummary: OverallSummary = {
     intraday: emptyCat(),
     stcg: emptyCat(),
@@ -636,7 +709,7 @@ export function processTransactions(
     total: emptyCat(),
   };
 
-  if (rawTxns.length === 0) {
+  if (allRawTxns.length === 0) {
     return {
       transactions: [],
       overallSummary: emptyOverallSummary,
@@ -655,25 +728,23 @@ export function processTransactions(
       remainingLTCGLoss: 0,
       totalTransactions: 0,
       fiscalYear: '',
-      parseErrors,
-      chargesDetected,
+      parseErrors: allParseErrors,
       totalChargesDeducted: 0,
-      totalSTT,
+      totalSTT: 0,
+      datasets: datasetsInfo,
     };
   }
 
-  // Step 2: Classify
-  const classified = rawTxns.map((tx) => classifyTransaction(tx, holdingThreshold));
+  // Step 2: Global Classification
+  const classified = allRawTxns.map((tx) => classifyTransaction(tx, holdingThreshold));
 
-  // Step 2.5: Build Overall Summary
+  // Step 2.5: Build Global Overall Summary
   const overallSummary: OverallSummary = {
     intraday: emptyCat(),
     stcg: emptyCat(),
     ltcg: emptyCat(),
     total: emptyCat(),
   };
-
-  let totalChargesDeducted = 0;
 
   for (const tx of classified) {
     let cat: CategorySummary;
@@ -690,14 +761,6 @@ export function processTransactions(
     overallSummary.total.saleValue += tx.saleValue;
     overallSummary.total.sellExpenses += tx.transferExpenses;
     overallSummary.total.gain += tx.capitalGain;
-
-    totalChargesDeducted += tx.transferExpenses + tx.purchaseExpenses;
-  }
-
-  // If charges came from individual columns, use the pre-computed total
-  // (avoids floating point drift from summing classified transactions)
-  if (chargesDetected && totalChargesFromColumns > 0) {
-    totalChargesDeducted = totalChargesFromColumns;
   }
 
   // Determine fiscal year from the first transaction's sell date
@@ -721,10 +784,10 @@ export function processTransactions(
     remainingLTCGLoss,
     totalTransactions: classified.length,
     fiscalYear,
-    parseErrors,
-    chargesDetected,
-    totalChargesDeducted,
-    totalSTT,
+    parseErrors: allParseErrors,
+    totalChargesDeducted: globalTotalChargesDeducted,
+    totalSTT: globalTotalSTT,
+    datasets: datasetsInfo,
   };
 }
 

@@ -33,6 +33,7 @@ type InputMode = 'upload' | 'paste';
 
 interface PasteDataset {
   id: number;
+  sourceName: string;
   rowCount: number;
   rows: Record<string, unknown>[];
 }
@@ -61,35 +62,37 @@ export function Dashboard() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
-  // Lump-sum charges state
-  const [lumpSumCharges, setLumpSumCharges] = useState(0);
-  const [lumpSumApplied, setLumpSumApplied] = useState(false);
+  // Lump-sum charges state (per dataset)
+  const [lumpSumCharges, setLumpSumCharges] = useState<Record<number, number>>({});
+  const [lumpSumApplied, setLumpSumApplied] = useState<Record<number, boolean>>({});
 
   // ─── Process combined rows from all datasets ───
   const processCombinedRows = useCallback(
-    (datasets: PasteDataset[]) => {
+    (datasets: PasteDataset[], customLumpSum = lumpSumCharges) => {
+      const inputs = datasets.map(d => {
+        const amount = customLumpSum[d.id] || 0;
+        const rows = amount > 0 ? distributeLumpSumCharges(d.rows, amount) : d.rows;
+        return { id: d.id, sourceName: d.sourceName, rows };
+      });
       const combined = datasets.flatMap(d => d.rows);
       setRawRows(combined);
-      const processingResult = processTransactions(combined, holdingThreshold);
+      const processingResult = processTransactions(inputs, holdingThreshold);
       setResult(processingResult);
       setShowMapper(false);
       setPasteRowCount(combined.length);
-      setLumpSumCharges(0);
-      setLumpSumApplied(false);
     },
-    [holdingThreshold]
+    [holdingThreshold, lumpSumCharges]
   );
 
   // ─── Shared processing function (for file upload + single source) ───
   const processRows = useCallback(
-    (rows: Record<string, unknown>[]) => {
-      setRawRows(rows);
-      const processingResult = processTransactions(rows, holdingThreshold);
-      setResult(processingResult);
-      setShowMapper(false);
-      setPasteRowCount(rows.length);
+    (rows: Record<string, unknown>[], sourceName: string = 'File Upload') => {
+      const dsId = ++datasetIdCounter;
+      const dataset: PasteDataset = { id: dsId, sourceName, rowCount: rows.length, rows };
+      setPasteDatasets([dataset]); // Save to pasteDatasets so threshold changes work seamlessly
+      processCombinedRows([dataset], {}); // Initial processing has no lump sum
     },
-    [holdingThreshold]
+    [processCombinedRows]
   );
 
   const makeEmptyResult = (errors: string[]): ProcessingResult => ({
@@ -108,9 +111,9 @@ export function Dashboard() {
     totalTransactions: 0,
     fiscalYear: '',
     parseErrors: errors,
-    chargesDetected: false,
     totalChargesDeducted: 0,
     totalSTT: 0,
+    datasets: [],
   });
 
   // ─── File upload handler ───
@@ -120,8 +123,8 @@ export function Dashboard() {
       setResult(null);
       setShowMapper(false);
       setPasteRowCount(null);
-      setLumpSumCharges(0);
-      setLumpSumApplied(false);
+      setLumpSumCharges({});
+      setLumpSumApplied({});
       setPasteDatasets([]);
       setShowPasteInput(true);
 
@@ -148,7 +151,7 @@ export function Dashboard() {
           if (requiredMapped) {
             // All required columns found — apply mapping and process directly
             const mappedRows = applyColumnMapping(jsonData, autoMapping);
-            processRows(mappedRows);
+            processRows(mappedRows, file.name);
           } else {
             // Show column mapper
             setPendingRows(jsonData);
@@ -199,6 +202,7 @@ export function Dashboard() {
           const mappedRows = applyColumnMapping(rows, autoMapping);
           const newDataset: PasteDataset = {
             id: ++datasetIdCounter,
+            sourceName: `Paste ${pasteDatasets.length + 1}`,
             rowCount: rawRowCount,
             rows: mappedRows,
           };
@@ -233,6 +237,7 @@ export function Dashboard() {
         const mappedRows = applyColumnMapping(pendingRows, mapping);
         const newDataset: PasteDataset = {
           id: ++datasetIdCounter,
+          sourceName: `Paste ${pasteDatasets.length + 1}`,
           rowCount: mappedRows.length,
           rows: mappedRows,
         };
@@ -258,15 +263,10 @@ export function Dashboard() {
     (newThreshold: number) => {
       setHoldingThreshold(newThreshold);
       if (pasteDatasets.length > 0) {
-        const combined = pasteDatasets.flatMap(d => d.rows);
-        const processingResult = processTransactions(combined, newThreshold);
-        setResult(processingResult);
-      } else if (rawRows) {
-        const processingResult = processTransactions(rawRows, newThreshold);
-        setResult(processingResult);
+        processCombinedRows(pasteDatasets);
       }
     },
-    [rawRows, pasteDatasets]
+    [pasteDatasets, processCombinedRows]
   );
 
   // ─── Remove a paste dataset ───
@@ -279,8 +279,8 @@ export function Dashboard() {
         setRawRows(null);
         setPasteRowCount(null);
         setShowPasteInput(true);
-        setLumpSumCharges(0);
-        setLumpSumApplied(false);
+        setLumpSumCharges({});
+        setLumpSumApplied({});
       } else {
         processCombinedRows(updatedDatasets);
       }
@@ -290,26 +290,14 @@ export function Dashboard() {
 
   // ─── Lump-sum charges handler ───
   const handleApplyLumpSum = useCallback(
-    (amount: number) => {
-      if (!rawRows) return;
-
-      if (amount <= 0) {
-        // Remove charges — reprocess original data
-        const processingResult = processTransactions(rawRows, holdingThreshold);
-        setResult(processingResult);
-        setLumpSumCharges(0);
-        setLumpSumApplied(false);
-        return;
-      }
-
-      // Distribute charges proportionally and reprocess
-      const chargedRows = distributeLumpSumCharges(rawRows, amount);
-      const processingResult = processTransactions(chargedRows, holdingThreshold);
-      setResult(processingResult);
-      setLumpSumCharges(amount);
-      setLumpSumApplied(true);
+    (datasetId: number, amount: number) => {
+      const newCharges = { ...lumpSumCharges, [datasetId]: amount };
+      const newApplied = { ...lumpSumApplied, [datasetId]: amount > 0 };
+      setLumpSumCharges(newCharges);
+      setLumpSumApplied(newApplied);
+      processCombinedRows(pasteDatasets, newCharges);
     },
-    [rawRows, holdingThreshold]
+    [lumpSumCharges, lumpSumApplied, pasteDatasets, processCombinedRows]
   );
 
   const handleSaveReport = (name: string, year: string) => {
@@ -336,16 +324,16 @@ export function Dashboard() {
       totalTransactions: report.totalTransactions,
       fiscalYear: report.fiscalYear,
       parseErrors: [],
-      chargesDetected: false,
       totalChargesDeducted: 0,
       totalSTT: 0,
+      datasets: [],
     });
     setRawRows(null); // Clear input rows since loaded from saved state
     setIsProcessing(false);
     setShowMapper(false);
     setPasteRowCount(null);
-    setLumpSumCharges(0);
-    setLumpSumApplied(false);
+    setLumpSumCharges({});
+    setLumpSumApplied({});
     setPasteDatasets([]);
     setShowPasteInput(true);
   };
@@ -533,16 +521,13 @@ export function Dashboard() {
         )}
 
         {/* ─── Charges Input ─── */}
-        {hasData && rawRows && (
+        {hasData && result.datasets && result.datasets.length > 0 && (
           <section className="mb-6">
             <ChargesInput
-              chargesDetected={result.chargesDetected}
-              totalChargesDeducted={result.totalChargesDeducted}
-              totalSTT={result.totalSTT}
-              totalTransactions={result.totalTransactions}
-              onApplyLumpSum={handleApplyLumpSum}
+              datasets={result.datasets}
+              lumpSumCharges={lumpSumCharges}
               lumpSumApplied={lumpSumApplied}
-              appliedAmount={lumpSumCharges}
+              onApplyLumpSum={handleApplyLumpSum}
             />
           </section>
         )}
@@ -551,7 +536,32 @@ export function Dashboard() {
         {hasData && (
           <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
             {/* Overall Summary */}
-            <OverallSummaryCards summary={result.overallSummary} />
+            <div className="space-y-8">
+              {result.datasets && result.datasets.length > 1 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-100 mb-3 flex items-center gap-2">
+                    <Database className="h-4 w-4 text-blue-400" />
+                    Combined Portfolio Summary
+                  </h3>
+                  <OverallSummaryCards summary={result.overallSummary} />
+                </div>
+              )}
+              
+              {result.datasets && result.datasets.map(ds => (
+                <div key={ds.id}>
+                  <h3 className="text-sm font-semibold text-zinc-100 mb-3 flex items-center gap-2">
+                    <Database className="h-4 w-4 text-zinc-400" />
+                    {ds.sourceName}
+                  </h3>
+                  <OverallSummaryCards summary={ds.overallSummary} />
+                </div>
+              ))}
+              
+              {/* Fallback for loaded reports without dataset info */}
+              {(!result.datasets || result.datasets.length === 0) && (
+                <OverallSummaryCards summary={result.overallSummary} />
+              )}
+            </div>
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
