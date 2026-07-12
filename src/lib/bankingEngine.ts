@@ -11,6 +11,7 @@ export type BankingCategory =
   | 'UNKNOWN';
 
 export interface BankTransaction {
+  id: string;
   date: Date;
   description: string;
   withdrawal: number;
@@ -80,10 +81,7 @@ export function classifyBankTransaction(
   return 'UNKNOWN';
 }
 
-export function processBankingTransactions(rows: Record<string, unknown>[]): BankingProcessingResult {
-  const transactions: BankTransaction[] = [];
-  const parseErrors: string[] = [];
-  
+export function recalculateBankingSummary(transactions: BankTransaction[]): BankingSummary {
   const summary: BankingSummary = {
     totalSalary: 0,
     totalDividend: 0,
@@ -92,8 +90,26 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
     totalOtherCredit: 0,
     totalWithdrawal: 0,
     totalInvestment: 0,
-    totalTransactions: 0,
+    totalTransactions: transactions.length,
   };
+
+  transactions.forEach((tx) => {
+    if (tx.category === 'SALARY') summary.totalSalary += tx.deposit;
+    if (tx.category === 'DIVIDEND') summary.totalDividend += tx.deposit;
+    if (tx.category === 'INTEREST') summary.totalInterest += tx.deposit;
+    if (tx.category === 'CASH_DEPOSIT') summary.totalCashDeposit += tx.deposit;
+    if (tx.category === 'OTHER_CREDIT') summary.totalOtherCredit += tx.deposit;
+    if (tx.category === 'WITHDRAWAL') summary.totalWithdrawal += tx.withdrawal;
+    if (tx.category === 'INVESTMENT') summary.totalInvestment += tx.withdrawal;
+  });
+
+  return summary;
+}
+
+export function processBankingTransactions(rows: Record<string, unknown>[]): BankingProcessingResult {
+  const transactions: BankTransaction[] = [];
+  const parseErrors: string[] = [];
+
 
   rows.forEach((row, index) => {
     const withdrawal = Math.abs(parseNumber(row.withdrawal || row.debit || row.dr || row.withdrawalAmount));
@@ -123,6 +139,7 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
     const category = classifyBankTransaction(description, withdrawal, deposit);
 
     const tx: BankTransaction = {
+      id: crypto.randomUUID(),
       date,
       description,
       withdrawal,
@@ -133,18 +150,9 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
     };
 
     transactions.push(tx);
-
-    // Update summary
-    if (category === 'SALARY') summary.totalSalary += deposit;
-    if (category === 'DIVIDEND') summary.totalDividend += deposit;
-    if (category === 'INTEREST') summary.totalInterest += deposit;
-    if (category === 'CASH_DEPOSIT') summary.totalCashDeposit += deposit;
-    if (category === 'OTHER_CREDIT') summary.totalOtherCredit += deposit;
-    if (category === 'WITHDRAWAL') summary.totalWithdrawal += withdrawal;
-    if (category === 'INVESTMENT') summary.totalInvestment += withdrawal;
   });
 
-  summary.totalTransactions = transactions.length;
+  const summary = recalculateBankingSummary(transactions);
 
   return {
     transactions,

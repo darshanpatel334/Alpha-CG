@@ -1,15 +1,16 @@
 import { useState, useCallback } from 'react';
 import { parseTSV, autoMapColumns, applyColumnMapping } from '@/lib/clipboardParser';
-import { processBankingTransactions, type BankingProcessingResult } from '@/lib/bankingEngine';
+import { processBankingTransactions, recalculateBankingSummary, type BankingProcessingResult } from '@/lib/bankingEngine';
 import { PasteZone } from './PasteZone';
 import { ColumnMapper } from './ColumnMapper';
 import { BankingSummaryCards } from './BankingSummaryCards';
 import { BankingTransactionsTable } from './BankingTransactionsTable';
-import { AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, Info, Database } from 'lucide-react';
 
 export function BankStatementDashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<BankingProcessingResult | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   
   // Mapper State
   const [showMapper, setShowMapper] = useState(false);
@@ -100,9 +101,28 @@ export function BankStatementDashboard() {
     setPendingAutoMapping({});
   }, []);
 
+  const handleCategoryChange = useCallback((txId: string, newCategory: string) => {
+    setResult(prev => {
+      if (!prev) return prev;
+      const updatedTransactions = prev.transactions.map(tx => 
+        tx.id === txId ? { ...tx, category: newCategory as any } : tx
+      );
+      const updatedSummary = recalculateBankingSummary(updatedTransactions);
+      return {
+        ...prev,
+        transactions: updatedTransactions,
+        summary: updatedSummary
+      };
+    });
+  }, []);
+
   const hasErrors = result && result.parseErrors.length > 0;
   const fatalErrors = result?.parseErrors.filter((e) => !e.startsWith('Info:')) ?? [];
   const infoMessages = result?.parseErrors.filter((e) => e.startsWith('Info:')) ?? [];
+
+  const filteredTransactions = result?.transactions.filter(tx => 
+    !activeCategory || tx.category === activeCategory
+  ) ?? [];
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
@@ -170,14 +190,31 @@ export function BankStatementDashboard() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-zinc-100">Bank Statement Summary</h2>
             <button
-              onClick={() => setResult(null)}
+              onClick={() => {
+                setResult(null);
+                setActiveCategory(null);
+              }}
               className="text-xs text-zinc-400 hover:text-zinc-200"
             >
               Start Over
             </button>
           </div>
-          <BankingSummaryCards summary={result.summary} />
-          <BankingTransactionsTable transactions={result.transactions} />
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-100 mb-3 flex items-center gap-2">
+              <Database className="h-4 w-4 text-emerald-400" />
+              Banking Portfolio Summary
+            </h3>
+            <BankingSummaryCards 
+              summary={result.summary} 
+              activeCategory={activeCategory}
+              onSelectCategory={setActiveCategory}
+            />
+          </div>
+
+          <BankingTransactionsTable 
+            transactions={filteredTransactions} 
+            onCategoryChange={handleCategoryChange}
+          />
         </div>
       )}
     </main>

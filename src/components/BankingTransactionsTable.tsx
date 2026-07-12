@@ -4,9 +4,10 @@ import { formatINR } from '@/lib/taxEngine';
 
 interface BankingTransactionsTableProps {
   transactions: BankTransaction[];
+  onCategoryChange?: (txId: string, newCategory: string) => void;
 }
 
-export function BankingTransactionsTable({ transactions }: BankingTransactionsTableProps) {
+export function BankingTransactionsTable({ transactions, onCategoryChange }: BankingTransactionsTableProps) {
   const getCategoryColor = (cat: string) => {
     switch (cat) {
       case 'SALARY': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -53,9 +54,26 @@ export function BankingTransactionsTable({ transactions }: BankingTransactionsTa
                   {formatINR(tx.balance, true)}
                 </td>
                 <td className="px-4 py-3 text-center whitespace-nowrap">
-                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getCategoryColor(tx.category)}`}>
-                    {tx.category.replace('_', ' ')}
-                  </span>
+                  {onCategoryChange ? (
+                    <select
+                      value={tx.category}
+                      onChange={(e) => onCategoryChange(tx.id, e.target.value)}
+                      className={`inline-flex appearance-none outline-none items-center rounded-full border px-2 py-0.5 text-[10px] font-medium cursor-pointer ${getCategoryColor(tx.category)}`}
+                    >
+                      <option value="SALARY">SALARY</option>
+                      <option value="DIVIDEND">DIVIDEND</option>
+                      <option value="INTEREST">INTEREST</option>
+                      <option value="CASH_DEPOSIT">CASH DEPOSIT</option>
+                      <option value="WITHDRAWAL">WITHDRAWAL</option>
+                      <option value="INVESTMENT">INVESTMENT</option>
+                      <option value="OTHER_CREDIT">OTHER CREDIT</option>
+                      <option value="UNKNOWN">UNKNOWN</option>
+                    </select>
+                  ) : (
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getCategoryColor(tx.category)}`}>
+                      {tx.category.replace('_', ' ')}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
