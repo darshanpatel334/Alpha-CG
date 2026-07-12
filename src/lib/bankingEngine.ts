@@ -96,6 +96,14 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
   };
 
   rows.forEach((row, index) => {
+    const withdrawal = Math.abs(parseNumber(row.withdrawal || row.debit || row.dr || row.withdrawalAmount));
+    const deposit = Math.abs(parseNumber(row.deposit || row.credit || row.cr || row.depositAmount));
+
+    if (withdrawal === 0 && deposit === 0) {
+      // Might be a header row or empty line inside data, skip silently
+      return;
+    }
+
     // Try to extract date
     const dateRaw = row.date || row.transactionDate || row.valueDate;
     const date = parseDate(dateRaw);
@@ -110,14 +118,7 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
       return;
     }
 
-    const withdrawal = Math.abs(parseNumber(row.withdrawal || row.debit || row.dr || row.withdrawalAmount));
-    const deposit = Math.abs(parseNumber(row.deposit || row.credit || row.cr || row.depositAmount));
     const balance = parseNumber(row.balance || row.bal);
-
-    if (withdrawal === 0 && deposit === 0) {
-      // Might be a header row or empty line inside data, skip silently or warn
-      return;
-    }
 
     const category = classifyBankTransaction(description, withdrawal, deposit);
 
