@@ -11,7 +11,7 @@ export interface SavedReport {
   fiscalYear: string;
 }
 
-const STORAGE_KEY = 'alphacg_saved_reports';
+const STORAGE_KEY = 'nivezotax_saved_reports';
 
 /**
  * Retrieve all saved reports from local storage.

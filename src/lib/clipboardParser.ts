@@ -132,6 +132,22 @@ export function autoMapColumns(
     stt: [
       'stt', 'securities transaction tax', 'securities_transaction_tax',
     ],
+    // Bank Statement Columns
+    date: [
+      'date', 'txn date', 'value date', 'transaction date', 'txn_date', 'value_date',
+    ],
+    description: [
+      'narration', 'description', 'particulars', 'remarks', 'transaction remarks',
+    ],
+    withdrawal: [
+      'withdrawal', 'debit', 'dr', 'dr amount', 'withdrawal amount', 'withdrawal amount inr', 'withdrawal amount (inr)',
+    ],
+    deposit: [
+      'deposit', 'credit', 'cr', 'cr amount', 'deposit amount', 'deposit amount inr', 'deposit amount (inr)',
+    ],
+    balance: [
+      'balance', 'bal', 'balance inr', 'balance (inr)',
+    ],
   };
 
   const result: Record<string, string | null> = {
@@ -150,6 +166,11 @@ export function autoMapColumns(
     igst: null,
     stampDuty: null,
     stt: null,
+    date: null,
+    description: null,
+    withdrawal: null,
+    deposit: null,
+    balance: null,
   };
 
   for (const [fieldName, aliases] of Object.entries(FIELD_ALIASES)) {
