@@ -176,6 +176,13 @@ export function ChargesInput({
           </div>
         );
       })}
+
+      <div className="mt-4 px-1">
+        <p className="text-[11px] font-medium text-zinc-400 mb-0.5">STT Exclusion Notice</p>
+        <p className="text-[10px] text-zinc-500 leading-relaxed">
+          Securities Transaction Tax (STT) is not deductible for Capital Gains under Section 48. If your data has an STT column (e.g. Zerodha), it will be automatically excluded. For lump-sum charges (e.g. Groww), ensure STT is excluded before entering the total.
+        </p>
+      </div>
     </div>
   );
 }

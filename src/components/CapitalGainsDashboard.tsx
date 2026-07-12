@@ -4,7 +4,6 @@ import { processTransactions, distributeLumpSumCharges, type ProcessingResult, D
 import { parseTSV, autoMapColumns, applyColumnMapping } from '@/lib/clipboardParser';
 import { PasteZone } from './PasteZone';
 import { ColumnMapper } from './ColumnMapper';
-import { STTWarningBanner } from './STTWarningBanner';
 import { HoldingPeriodConfig } from './HoldingPeriodConfig';
 import { OverallSummaryCards } from './OverallSummaryCards';
 import { RawGainsTable } from './RawGainsTable';
@@ -275,8 +274,6 @@ export function CapitalGainsDashboard() {
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* ─── Input Section ─── */}
         <section className="mb-8 space-y-4">
-          <STTWarningBanner />
-
           {/* Input zones */}
           <div className="space-y-3">
               {/* Existing dataset chips */}
