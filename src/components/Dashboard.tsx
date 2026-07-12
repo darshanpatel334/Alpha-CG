@@ -24,9 +24,20 @@ import {
   ClipboardPaste,
   Save,
   FolderOpen,
+  Plus,
+  X,
+  Database,
 } from 'lucide-react';
 
 type InputMode = 'upload' | 'paste';
+
+interface PasteDataset {
+  id: number;
+  rowCount: number;
+  rows: Record<string, unknown>[];
+}
+
+let datasetIdCounter = 0;
 
 export function Dashboard() {
   const [inputMode, setInputMode] = useState<InputMode>('upload');
@@ -42,6 +53,10 @@ export function Dashboard() {
   const [pendingAutoMapping, setPendingAutoMapping] = useState<Record<string, string | null>>({});
   const [pasteRowCount, setPasteRowCount] = useState<number | null>(null);
 
+  // Multi-demat paste state
+  const [pasteDatasets, setPasteDatasets] = useState<PasteDataset[]>([]);
+  const [showPasteInput, setShowPasteInput] = useState(true);
+
   // Save/Load Modals state
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
@@ -50,7 +65,22 @@ export function Dashboard() {
   const [lumpSumCharges, setLumpSumCharges] = useState(0);
   const [lumpSumApplied, setLumpSumApplied] = useState(false);
 
-  // ─── Shared processing function ───
+  // ─── Process combined rows from all datasets ───
+  const processCombinedRows = useCallback(
+    (datasets: PasteDataset[]) => {
+      const combined = datasets.flatMap(d => d.rows);
+      setRawRows(combined);
+      const processingResult = processTransactions(combined, holdingThreshold);
+      setResult(processingResult);
+      setShowMapper(false);
+      setPasteRowCount(combined.length);
+      setLumpSumCharges(0);
+      setLumpSumApplied(false);
+    },
+    [holdingThreshold]
+  );
+
+  // ─── Shared processing function (for file upload + single source) ───
   const processRows = useCallback(
     (rows: Record<string, unknown>[]) => {
       setRawRows(rows);
@@ -92,6 +122,8 @@ export function Dashboard() {
       setPasteRowCount(null);
       setLumpSumCharges(0);
       setLumpSumApplied(false);
+      setPasteDatasets([]);
+      setShowPasteInput(true);
 
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -143,13 +175,10 @@ export function Dashboard() {
     [holdingThreshold, processRows]
   );
 
-  // ─── Paste handler ───
+  // ─── Paste handler (appends to datasets) ───
   const handleDataPasted = useCallback(
     (text: string) => {
       setIsProcessing(true);
-      setResult(null);
-      setLumpSumCharges(0);
-      setLumpSumApplied(false);
 
       try {
         const { headers, rows, rawRowCount } = parseTSV(text);
@@ -166,10 +195,17 @@ export function Dashboard() {
           autoMapping.purchaseValue && autoMapping.saleValue;
 
         if (requiredMapped) {
-          // Auto-detected — apply mapping and process
+          // Auto-detected — apply mapping and add to datasets
           const mappedRows = applyColumnMapping(rows, autoMapping);
-          processRows(mappedRows);
-          setPasteRowCount(rawRowCount);
+          const newDataset: PasteDataset = {
+            id: ++datasetIdCounter,
+            rowCount: rawRowCount,
+            rows: mappedRows,
+          };
+          const updatedDatasets = [...pasteDatasets, newDataset];
+          setPasteDatasets(updatedDatasets);
+          setShowPasteInput(false);
+          processCombinedRows(updatedDatasets);
         } else {
           // Show column mapper
           setPendingRows(rows);
@@ -187,7 +223,7 @@ export function Dashboard() {
         setIsProcessing(false);
       }
     },
-    [processRows]
+    [pasteDatasets, processCombinedRows]
   );
 
   // ─── Column mapper confirm ───
@@ -195,10 +231,18 @@ export function Dashboard() {
     (mapping: Record<string, string | null>) => {
       if (pendingRows) {
         const mappedRows = applyColumnMapping(pendingRows, mapping);
-        processRows(mappedRows);
+        const newDataset: PasteDataset = {
+          id: ++datasetIdCounter,
+          rowCount: mappedRows.length,
+          rows: mappedRows,
+        };
+        const updatedDatasets = [...pasteDatasets, newDataset];
+        setPasteDatasets(updatedDatasets);
+        setShowPasteInput(false);
+        processCombinedRows(updatedDatasets);
       }
     },
-    [pendingRows, processRows]
+    [pendingRows, pasteDatasets, processCombinedRows]
   );
 
   const handleMappingCancelled = useCallback(() => {
@@ -213,12 +257,35 @@ export function Dashboard() {
   const handleThresholdChange = useCallback(
     (newThreshold: number) => {
       setHoldingThreshold(newThreshold);
-      if (rawRows) {
+      if (pasteDatasets.length > 0) {
+        const combined = pasteDatasets.flatMap(d => d.rows);
+        const processingResult = processTransactions(combined, newThreshold);
+        setResult(processingResult);
+      } else if (rawRows) {
         const processingResult = processTransactions(rawRows, newThreshold);
         setResult(processingResult);
       }
     },
-    [rawRows]
+    [rawRows, pasteDatasets]
+  );
+
+  // ─── Remove a paste dataset ───
+  const handleRemoveDataset = useCallback(
+    (datasetId: number) => {
+      const updatedDatasets = pasteDatasets.filter(d => d.id !== datasetId);
+      setPasteDatasets(updatedDatasets);
+      if (updatedDatasets.length === 0) {
+        setResult(null);
+        setRawRows(null);
+        setPasteRowCount(null);
+        setShowPasteInput(true);
+        setLumpSumCharges(0);
+        setLumpSumApplied(false);
+      } else {
+        processCombinedRows(updatedDatasets);
+      }
+    },
+    [pasteDatasets, processCombinedRows]
   );
 
   // ─── Lump-sum charges handler ───
@@ -279,6 +346,8 @@ export function Dashboard() {
     setPasteRowCount(null);
     setLumpSumCharges(0);
     setLumpSumApplied(false);
+    setPasteDatasets([]);
+    setShowPasteInput(true);
   };
 
   const hasData = result && (result.transactions.length > 0 || !rawRows); // rawRows is null for loaded reports
@@ -365,11 +434,49 @@ export function Dashboard() {
           {inputMode === 'upload' ? (
             <UploadZone onFileAccepted={handleFileAccepted} isProcessing={isProcessing} />
           ) : (
-            <PasteZone
-              onDataPasted={handleDataPasted}
-              isProcessing={isProcessing}
-              rowCount={pasteRowCount}
-            />
+            <div className="space-y-3">
+              {/* Existing dataset chips */}
+              {pasteDatasets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {pasteDatasets.map((ds, idx) => (
+                    <div
+                      key={ds.id}
+                      className="inline-flex items-center gap-2 rounded-md border border-zinc-700/60 bg-zinc-800/50 px-3 py-1.5 text-xs"
+                    >
+                      <Database className="h-3 w-3 text-blue-400" strokeWidth={1.5} />
+                      <span className="text-zinc-300 font-medium">Paste {idx + 1}</span>
+                      <span className="text-zinc-500">·</span>
+                      <span className="text-zinc-400 tabular-nums">{ds.rowCount} rows</span>
+                      <button
+                        onClick={() => handleRemoveDataset(ds.id)}
+                        className="ml-1 rounded p-0.5 text-zinc-600 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+                        aria-label={`Remove paste ${idx + 1}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {!showPasteInput && (
+                    <button
+                      onClick={() => setShowPasteInput(true)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-zinc-700 px-3 py-1.5 text-xs text-zinc-500 hover:border-blue-500/40 hover:text-blue-400 hover:bg-blue-500/5 transition-all"
+                    >
+                      <Plus className="h-3 w-3" strokeWidth={2} />
+                      Add Another Demat
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Paste input zone */}
+              {showPasteInput && (
+                <PasteZone
+                  onDataPasted={handleDataPasted}
+                  isProcessing={isProcessing}
+                  rowCount={pasteDatasets.length === 0 ? pasteRowCount : null}
+                />
+              )}
+            </div>
           )}
 
           {/* Column Mapper */}
