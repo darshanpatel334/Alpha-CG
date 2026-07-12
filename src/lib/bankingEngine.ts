@@ -12,6 +12,8 @@ export type BankingCategory =
 
 export interface BankTransaction {
   id: string;
+  datasetId: number;
+  sourceName: string;
   date: Date;
   description: string;
   withdrawal: number;
@@ -106,50 +108,53 @@ export function recalculateBankingSummary(transactions: BankTransaction[]): Bank
   return summary;
 }
 
-export function processBankingTransactions(rows: Record<string, unknown>[]): BankingProcessingResult {
+export function processBankingTransactions(datasets: { id: number; sourceName: string; rows: Record<string, unknown>[] }[]): BankingProcessingResult {
   const transactions: BankTransaction[] = [];
   const parseErrors: string[] = [];
 
+  datasets.forEach((dataset) => {
+    dataset.rows.forEach((row, index) => {
+      const withdrawal = Math.abs(parseNumber(row.withdrawal || row.debit || row.dr || row.withdrawalAmount));
+      const deposit = Math.abs(parseNumber(row.deposit || row.credit || row.cr || row.depositAmount));
 
-  rows.forEach((row, index) => {
-    const withdrawal = Math.abs(parseNumber(row.withdrawal || row.debit || row.dr || row.withdrawalAmount));
-    const deposit = Math.abs(parseNumber(row.deposit || row.credit || row.cr || row.depositAmount));
+      if (withdrawal === 0 && deposit === 0) {
+        // Might be a header row or empty line inside data, skip silently
+        return;
+      }
 
-    if (withdrawal === 0 && deposit === 0) {
-      // Might be a header row or empty line inside data, skip silently
-      return;
-    }
+      // Try to extract date
+      const dateRaw = row.date || row.transactionDate || row.valueDate;
+      const date = parseDate(dateRaw);
+      if (!date) {
+        parseErrors.push(`[${dataset.sourceName}] Row ${index + 1}: Invalid or missing date '${dateRaw}'`);
+        return;
+      }
 
-    // Try to extract date
-    const dateRaw = row.date || row.transactionDate || row.valueDate;
-    const date = parseDate(dateRaw);
-    if (!date) {
-      parseErrors.push(`Row ${index + 1}: Invalid or missing date '${dateRaw}'`);
-      return;
-    }
+      const description = String(row.description || row.narration || row.transactionRemarks || row.particulars || '').trim();
+      if (!description) {
+        parseErrors.push(`[${dataset.sourceName}] Row ${index + 1}: Missing description/narration`);
+        return;
+      }
 
-    const description = String(row.description || row.narration || row.transactionRemarks || row.particulars || '').trim();
-    if (!description) {
-      parseErrors.push(`Row ${index + 1}: Missing description/narration`);
-      return;
-    }
+      const balance = parseNumber(row.balance || row.bal);
 
-    const balance = parseNumber(row.balance || row.bal);
+      const category = classifyBankTransaction(description, withdrawal, deposit);
 
-    const category = classifyBankTransaction(description, withdrawal, deposit);
+      const tx: BankTransaction = {
+        id: crypto.randomUUID(),
+        datasetId: dataset.id,
+        sourceName: dataset.sourceName,
+        date,
+        description,
+        withdrawal,
+        deposit,
+        balance,
+        category,
+        raw: row,
+      };
 
-    const tx: BankTransaction = {
-      id: crypto.randomUUID(),
-      date,
-      description,
-      withdrawal,
-      deposit,
-      balance,
-      category,
-      raw: row,
-    };
-
-    transactions.push(tx);
+      transactions.push(tx);
+    });
   });
 
   const summary = recalculateBankingSummary(transactions);

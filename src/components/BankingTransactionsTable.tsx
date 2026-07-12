@@ -28,6 +28,7 @@ export function BankingTransactionsTable({ transactions, onCategoryChange }: Ban
           <thead className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-10 shadow-sm shadow-black/20">
             <tr>
               <th className="px-4 py-3 font-medium text-zinc-400 whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 font-medium text-zinc-400 whitespace-nowrap">Source</th>
               <th className="px-4 py-3 font-medium text-zinc-400 w-1/2">Description</th>
               <th className="px-4 py-3 font-medium text-zinc-400 text-right whitespace-nowrap">Withdrawal</th>
               <th className="px-4 py-3 font-medium text-zinc-400 text-right whitespace-nowrap">Deposit</th>
@@ -40,6 +41,9 @@ export function BankingTransactionsTable({ transactions, onCategoryChange }: Ban
               <tr key={idx} className="hover:bg-zinc-800/30 transition-colors">
                 <td className="px-4 py-3 text-zinc-300 whitespace-nowrap">
                   {new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(tx.date)}
+                </td>
+                <td className="px-4 py-3 text-zinc-500 whitespace-nowrap text-[10px] uppercase tracking-wider">
+                  {tx.sourceName}
                 </td>
                 <td className="px-4 py-3 text-zinc-400 max-w-sm truncate" title={tx.description}>
                   {tx.description}

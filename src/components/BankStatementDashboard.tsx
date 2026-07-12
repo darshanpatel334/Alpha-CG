@@ -7,10 +7,24 @@ import { BankingSummaryCards } from './BankingSummaryCards';
 import { BankingTransactionsTable } from './BankingTransactionsTable';
 import { AlertCircle, Info, Database } from 'lucide-react';
 
+let datasetIdCounter = 0;
+
+export interface PasteDataset {
+  id: number;
+  sourceName: string;
+  rowCount: number;
+  rows: Record<string, unknown>[];
+}
+
 export function BankStatementDashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<BankingProcessingResult | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  
+  // Multi-dataset state
+  const [pasteDatasets, setPasteDatasets] = useState<PasteDataset[]>([]);
+  const [showPasteInput, setShowPasteInput] = useState(true);
+  const [activeTab, setActiveTab] = useState<'ALL' | number>('ALL');
   
   // Mapper State
   const [showMapper, setShowMapper] = useState(false);
@@ -18,8 +32,13 @@ export function BankStatementDashboard() {
   const [pendingHeaders, setPendingHeaders] = useState<string[]>([]);
   const [pendingAutoMapping, setPendingAutoMapping] = useState<Record<string, string | null>>({});
 
-  const processRows = useCallback((rows: Record<string, unknown>[]) => {
-    const processingResult = processBankingTransactions(rows);
+  const processCombinedRows = useCallback((datasets: PasteDataset[]) => {
+    const inputs = datasets.map(d => ({
+      id: d.id,
+      sourceName: d.sourceName,
+      rows: d.rows,
+    }));
+    const processingResult = processBankingTransactions(inputs);
     setResult(processingResult);
     setShowMapper(false);
   }, []);
@@ -55,7 +74,16 @@ export function BankStatementDashboard() {
 
         if (requiredMapped) {
           const mappedRows = applyColumnMapping(rows, autoMapping);
-          processRows(mappedRows);
+          const newDataset: PasteDataset = {
+            id: ++datasetIdCounter,
+            sourceName: `Statement ${pasteDatasets.length + 1}`,
+            rowCount: rows.length,
+            rows: mappedRows,
+          };
+          const updatedDatasets = [...pasteDatasets, newDataset];
+          setPasteDatasets(updatedDatasets);
+          setShowPasteInput(false);
+          processCombinedRows(updatedDatasets);
         } else {
           setPendingRows(rows);
           setPendingHeaders(headers);
@@ -81,17 +109,26 @@ export function BankStatementDashboard() {
         setIsProcessing(false);
       }
     },
-    [processRows]
+    [pasteDatasets, processCombinedRows]
   );
 
   const handleMappingConfirmed = useCallback(
     (mapping: Record<string, string | null>) => {
       if (pendingRows) {
         const mappedRows = applyColumnMapping(pendingRows, mapping);
-        processRows(mappedRows);
+        const newDataset: PasteDataset = {
+          id: ++datasetIdCounter,
+          sourceName: `Statement ${pasteDatasets.length + 1}`,
+          rowCount: mappedRows.length,
+          rows: mappedRows,
+        };
+        const updatedDatasets = [...pasteDatasets, newDataset];
+        setPasteDatasets(updatedDatasets);
+        setShowPasteInput(false);
+        processCombinedRows(updatedDatasets);
       }
     },
-    [pendingRows, processRows]
+    [pendingRows, pasteDatasets, processCombinedRows]
   );
 
   const handleMappingCancelled = useCallback(() => {
@@ -120,15 +157,21 @@ export function BankStatementDashboard() {
   const fatalErrors = result?.parseErrors.filter((e) => !e.startsWith('Info:')) ?? [];
   const infoMessages = result?.parseErrors.filter((e) => e.startsWith('Info:')) ?? [];
 
-  const filteredTransactions = result?.transactions.filter(tx => 
-    !activeCategory || tx.category === activeCategory
+  const tabFilteredTransactions = result?.transactions.filter(tx => 
+    activeTab === 'ALL' || tx.datasetId === activeTab
   ) ?? [];
+
+  const filteredTransactions = tabFilteredTransactions.filter(tx => 
+    !activeCategory || tx.category === activeCategory
+  );
+
+  const displaySummary = result ? (activeTab === 'ALL' ? result.summary : recalculateBankingSummary(tabFilteredTransactions)) : null;
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       {/* ─── Input Section ─── */}
       <section className="mb-8 space-y-4">
-        {!result && (
+        {showPasteInput && (
           <PasteZone
             onDataPasted={handleDataPasted}
             isProcessing={isProcessing}
@@ -187,28 +230,73 @@ export function BankStatementDashboard() {
       {/* ─── Results Dashboard ─── */}
       {result && result.transactions.length > 0 && (
         <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-zinc-100">Bank Statement Summary</h2>
-            <button
-              onClick={() => {
-                setResult(null);
-                setActiveCategory(null);
-              }}
-              className="text-xs text-zinc-400 hover:text-zinc-200"
-            >
-              Start Over
-            </button>
+            <div className="flex items-center gap-3">
+              {!showPasteInput && (
+                <button
+                  onClick={() => setShowPasteInput(true)}
+                  className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors bg-emerald-400/10 hover:bg-emerald-400/20 px-3 py-1.5 rounded-md"
+                >
+                  + Add Statement
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setResult(null);
+                  setActiveCategory(null);
+                  setPasteDatasets([]);
+                  setActiveTab('ALL');
+                  setShowPasteInput(true);
+                }}
+                className="text-xs text-zinc-400 hover:text-zinc-200"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
+
+          {/* ─── Tabs ─── */}
+          {pasteDatasets.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-2">
+              <button
+                onClick={() => { setActiveTab('ALL'); setActiveCategory(null); }}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                  activeTab === 'ALL'
+                    ? 'bg-zinc-800 text-zinc-100 border-b-2 border-emerald-500'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                }`}
+              >
+                Consolidated
+              </button>
+              {pasteDatasets.map((ds) => (
+                <button
+                  key={ds.id}
+                  onClick={() => { setActiveTab(ds.id); setActiveCategory(null); }}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                    activeTab === ds.id
+                      ? 'bg-zinc-800 text-zinc-100 border-b-2 border-blue-500'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                  }`}
+                >
+                  {ds.sourceName}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div>
             <h3 className="text-sm font-semibold text-zinc-100 mb-3 flex items-center gap-2">
               <Database className="h-4 w-4 text-emerald-400" />
-              Banking Portfolio Summary
+              {activeTab === 'ALL' ? 'Combined Portfolio Summary' : `${pasteDatasets.find(d => d.id === activeTab)?.sourceName} Summary`}
             </h3>
-            <BankingSummaryCards 
-              summary={result.summary} 
-              activeCategory={activeCategory}
-              onSelectCategory={setActiveCategory}
-            />
+            {displaySummary && (
+              <BankingSummaryCards 
+                summary={displaySummary} 
+                activeCategory={activeCategory}
+                onSelectCategory={setActiveCategory}
+              />
+            )}
           </div>
 
           <BankingTransactionsTable 
