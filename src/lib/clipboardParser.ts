@@ -219,6 +219,13 @@ export function applyColumnMapping(
     if (mapping.stampDuty) mapped['Stamp Duty'] = row[mapping.stampDuty];
     if (mapping.stt) mapped['STT'] = row[mapping.stt];
 
+    // Bank Statement Columns
+    if (mapping.date) mapped['date'] = row[mapping.date];
+    if (mapping.description) mapped['description'] = row[mapping.description];
+    if (mapping.withdrawal) mapped['withdrawal'] = row[mapping.withdrawal];
+    if (mapping.deposit) mapped['deposit'] = row[mapping.deposit];
+    if (mapping.balance) mapped['balance'] = row[mapping.balance];
+
     return mapped;
   });
 }
