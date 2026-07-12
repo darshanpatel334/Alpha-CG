@@ -110,6 +110,30 @@ export function autoMapColumns(
       'sale charges', 'sale_charges', 'sell brokerage', 'sale brokerage',
       'selling charges', 'selling_charges', 'transfer charges',
     ],
+    // Zerodha-style individual charge columns
+    brokerage: [
+      'brokerage', 'brokerage charges',
+    ],
+    exchangeTransactionCharges: [
+      'exchange transaction charges', 'exchange_transaction_charges',
+      'exchange charges', 'exchange_charges', 'transaction charges',
+      'exchange turnover charges', 'turnover charges',
+    ],
+    ipft: [
+      'ipft', 'ipft charges', 'investor protection fund',
+    ],
+    sebiCharges: [
+      'sebi charges', 'sebi_charges', 'sebi fees', 'sebi turnover fees',
+    ],
+    cgst: ['cgst'],
+    sgst: ['sgst'],
+    igst: ['igst'],
+    stampDuty: [
+      'stamp duty', 'stamp_duty', 'stampduty', 'stamp charges',
+    ],
+    stt: [
+      'stt', 'securities transaction tax', 'securities_transaction_tax',
+    ],
   };
 
   const result: Record<string, string | null> = {
@@ -119,6 +143,15 @@ export function autoMapColumns(
     saleValue: null,
     purchaseExpenses: null,
     transferExpenses: null,
+    brokerage: null,
+    exchangeTransactionCharges: null,
+    ipft: null,
+    sebiCharges: null,
+    cgst: null,
+    sgst: null,
+    igst: null,
+    stampDuty: null,
+    stt: null,
   };
 
   for (const [fieldName, aliases] of Object.entries(FIELD_ALIASES)) {

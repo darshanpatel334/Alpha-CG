@@ -87,6 +87,12 @@ export interface ProcessingResult {
   totalTransactions: number;
   fiscalYear: string;
   parseErrors: string[];
+  /** Whether per-transaction charge columns were detected (e.g. Zerodha) */
+  chargesDetected: boolean;
+  /** Total non-STT charges deducted from gains */
+  totalChargesDeducted: number;
+  /** Total STT detected (not deducted — shown for info only) */
+  totalSTT: number;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -136,6 +142,30 @@ const COLUMN_ALIASES: Record<string, string[]> = {
     'sell_expenses', 'sell expenses', 'sale_expenses', 'sale expenses',
     'sell_brokerage', 'sale_brokerage', 'sell charges',
   ],
+  // Zerodha-style individual charge columns (non-STT)
+  brokerage: [
+    'brokerage', 'brokerage charges',
+  ],
+  exchangeTransactionCharges: [
+    'exchange transaction charges', 'exchange_transaction_charges',
+    'exchange charges', 'exchange_charges', 'transaction charges',
+    'exchange turnover charges', 'turnover charges',
+  ],
+  ipft: [
+    'ipft', 'ipft charges', 'investor protection fund',
+  ],
+  sebiCharges: [
+    'sebi charges', 'sebi_charges', 'sebi fees', 'sebi turnover fees',
+  ],
+  cgst: ['cgst'],
+  sgst: ['sgst'],
+  igst: ['igst'],
+  stampDuty: [
+    'stamp duty', 'stamp_duty', 'stampduty', 'stamp charges',
+  ],
+  stt: [
+    'stt', 'securities transaction tax', 'securities_transaction_tax',
+  ],
 };
 
 /**
@@ -157,29 +187,59 @@ function findColumnKey(headers: string[], fieldName: string): string | null {
   return null;
 }
 
+// ─── Zerodha-style individual charge column keys (non-STT) ──────────────────
+
+const ZERODHA_CHARGE_KEYS = [
+  'brokerage', 'exchangeTransactionCharges', 'ipft', 'sebiCharges',
+  'cgst', 'sgst', 'igst', 'stampDuty',
+] as const;
+
 // ─── Parsing ────────────────────────────────────────────────────────────────
+
+export interface ParseResult {
+  transactions: RawTransaction[];
+  errors: string[];
+  /** True if per-transaction charge columns (Zerodha-style) were detected */
+  chargesDetected: boolean;
+  /** Total STT detected across all transactions (for display only) */
+  totalSTT: number;
+  /** Total non-STT charges summed from per-transaction columns */
+  totalChargesFromColumns: number;
+}
 
 /**
  * Parse raw Excel JSON rows into typed transactions.
- * Returns parsed transactions and any parse errors encountered.
+ * Automatically detects Zerodha-style individual charge columns (Brokerage,
+ * Exchange Transaction Charges, IPFT, SEBI Charges, CGST, SGST, IGST,
+ * Stamp Duty) and sums them into transferExpenses. STT is excluded.
  */
 export function parseTransactions(
   rows: Record<string, unknown>[]
-): { transactions: RawTransaction[]; errors: string[] } {
+): ParseResult {
   if (!rows || rows.length === 0) {
-    return { transactions: [], errors: ['No data rows found in the uploaded file.'] };
+    return { transactions: [], errors: ['No data rows found in the uploaded file.'], chargesDetected: false, totalSTT: 0, totalChargesFromColumns: 0 };
   }
 
   const headers = Object.keys(rows[0]);
   const errors: string[] = [];
 
-  // Map columns
+  // Map core columns
   const buyDateCol = findColumnKey(headers, 'buyDate');
   const sellDateCol = findColumnKey(headers, 'sellDate');
   const purchaseValueCol = findColumnKey(headers, 'purchaseValue');
   const saleValueCol = findColumnKey(headers, 'saleValue');
   const purchaseExpensesCol = findColumnKey(headers, 'purchaseExpenses');
   const transferExpensesCol = findColumnKey(headers, 'transferExpenses');
+
+  // Detect Zerodha-style individual charge columns
+  const chargeColMap: Record<string, string | null> = {};
+  for (const key of ZERODHA_CHARGE_KEYS) {
+    chargeColMap[key] = findColumnKey(headers, key);
+  }
+  const sttCol = findColumnKey(headers, 'stt');
+
+  const detectedChargeCols = ZERODHA_CHARGE_KEYS.filter(k => chargeColMap[k] !== null);
+  const hasIndividualCharges = detectedChargeCols.length > 0;
 
   // Validate required columns
   if (!buyDateCol) errors.push('Required column "Buy_Date" not found. Expected aliases: Buy_Date, Purchase_Date, etc.');
@@ -188,18 +248,35 @@ export function parseTransactions(
   if (!saleValueCol) errors.push('Required column "Sale_Value" not found. Expected aliases: Sale_Value, Sell_Value, Sale_Consideration, etc.');
 
   if (errors.length > 0) {
-    return { transactions: [], errors };
+    return { transactions: [], errors, chargesDetected: false, totalSTT: 0, totalChargesFromColumns: 0 };
   }
 
-  // Optional columns default to 0
-  if (!purchaseExpensesCol) {
-    errors.push('Info: "Purchase_Expenses" column not found — defaulting to ₹0.');
+  // Determine charge handling mode
+  const hasLegacyExpenses = !!(purchaseExpensesCol || transferExpensesCol);
+
+  if (hasIndividualCharges) {
+    const detectedNames = detectedChargeCols.map(k => chargeColMap[k]).join(', ');
+    errors.push(`Info: Detected per-transaction charge columns: ${detectedNames}. Non-STT charges will be deducted from gains.`);
+    if (sttCol) {
+      errors.push('Info: STT column detected — excluded from expense deduction (not deductible under Section 48).');
+    }
+  } else if (!hasLegacyExpenses) {
+    errors.push('Info: No per-transaction charge columns found. You can enter total charges (excl. STT) for proportional distribution.');
   }
-  if (!transferExpensesCol) {
-    errors.push('Info: "Transfer_Expenses" column not found — defaulting to ₹0.');
+
+  // Optional legacy expense columns
+  if (!hasIndividualCharges) {
+    if (!purchaseExpensesCol) {
+      errors.push('Info: "Purchase_Expenses" column not found — defaulting to ₹0.');
+    }
+    if (!transferExpensesCol) {
+      errors.push('Info: "Transfer_Expenses" column not found — defaulting to ₹0.');
+    }
   }
 
   const transactions: RawTransaction[] = [];
+  let totalSTT = 0;
+  let totalChargesFromColumns = 0;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -209,8 +286,6 @@ export function parseTransactions(
     const sellDate = parseDate(row[sellDateCol!]);
     const purchaseValue = parseNumber(row[purchaseValueCol!]);
     const saleValue = parseNumber(row[saleValueCol!]);
-    const purchaseExpenses = purchaseExpensesCol ? parseNumber(row[purchaseExpensesCol]) : 0;
-    const transferExpenses = transferExpensesCol ? parseNumber(row[transferExpensesCol]) : 0;
 
     if (!buyDate) {
       errors.push(`Row ${rowNum}: Invalid Buy_Date "${row[buyDateCol!]}". Skipped.`);
@@ -229,17 +304,49 @@ export function parseTransactions(
       continue;
     }
 
+    let purchaseExpenses = 0;
+    let transferExpenses = 0;
+
+    if (hasIndividualCharges) {
+      // Sum all non-STT charge columns into transferExpenses
+      let rowCharges = 0;
+      for (const key of ZERODHA_CHARGE_KEYS) {
+        if (chargeColMap[key]) {
+          const val = parseNumber(row[chargeColMap[key]!]);
+          if (val !== null) rowCharges += val;
+        }
+      }
+      transferExpenses = rowCharges;
+      totalChargesFromColumns += rowCharges;
+
+      // Track STT separately
+      if (sttCol) {
+        const sttVal = parseNumber(row[sttCol]);
+        if (sttVal !== null) totalSTT += sttVal;
+      }
+    } else {
+      // Use legacy expense columns
+      purchaseExpenses = purchaseExpensesCol ? (parseNumber(row[purchaseExpensesCol]) ?? 0) : 0;
+      transferExpenses = transferExpensesCol ? (parseNumber(row[transferExpensesCol]) ?? 0) : 0;
+    }
+
     transactions.push({
       buyDate,
       sellDate,
       purchaseValue,
       saleValue,
-      purchaseExpenses: purchaseExpenses ?? 0,
-      transferExpenses: transferExpenses ?? 0,
+      purchaseExpenses,
+      transferExpenses,
     });
   }
 
-  return { transactions, errors };
+  return {
+    transactions,
+    errors,
+    chargesDetected: hasIndividualCharges,
+    totalSTT,
+    totalChargesFromColumns,
+  };
 }
 
 function parseNumber(value: unknown): number | null {
@@ -451,6 +558,52 @@ export function applyLossSetOff(aggregates: PeriodAggregate[]): {
   };
 }
 
+// ─── Lump-Sum Charge Distribution ───────────────────────────────────────────
+
+/**
+ * Distribute a lump-sum charge amount (excl. STT) proportionally across
+ * transactions based on each transaction's trade value (buyValue + sellValue)
+ * relative to the total trade value of all transactions.
+ *
+ * Returns new rows with the distributed charges added to transferExpenses.
+ */
+export function distributeLumpSumCharges(
+  rows: Record<string, unknown>[],
+  lumpSumAmount: number
+): Record<string, unknown>[] {
+  if (lumpSumAmount <= 0 || rows.length === 0) return rows;
+
+  // Calculate total trade value across all rows to determine proportions
+  const headers = Object.keys(rows[0]);
+  const purchaseValueCol = findColumnKey(headers, 'purchaseValue');
+  const saleValueCol = findColumnKey(headers, 'saleValue');
+
+  if (!purchaseValueCol || !saleValueCol) return rows;
+
+  const tradeValues = rows.map(row => {
+    const buy = parseNumber(row[purchaseValueCol]) ?? 0;
+    const sell = parseNumber(row[saleValueCol]) ?? 0;
+    return Math.abs(buy) + Math.abs(sell);
+  });
+
+  const totalTradeValue = tradeValues.reduce((sum, v) => sum + v, 0);
+  if (totalTradeValue === 0) return rows;
+
+  // Find or determine the transfer_expenses column name
+  const transferExpensesCol = findColumnKey(headers, 'transferExpenses') || 'Transfer_Expenses';
+
+  return rows.map((row, i) => {
+    const proportion = tradeValues[i] / totalTradeValue;
+    const distributedCharge = lumpSumAmount * proportion;
+    const existingExpense = parseNumber(row[transferExpensesCol]) ?? 0;
+
+    return {
+      ...row,
+      [transferExpensesCol]: existingExpense + distributedCharge,
+    };
+  });
+}
+
 // ─── Main Processing Pipeline ───────────────────────────────────────────────
 
 /**
@@ -461,7 +614,13 @@ export function processTransactions(
   holdingThreshold: number = DEFAULT_HOLDING_THRESHOLD
 ): ProcessingResult {
   // Step 1: Parse
-  const { transactions: rawTxns, errors: parseErrors } = parseTransactions(rows);
+  const {
+    transactions: rawTxns,
+    errors: parseErrors,
+    chargesDetected,
+    totalSTT,
+    totalChargesFromColumns,
+  } = parseTransactions(rows);
 
   const emptyCat = (): CategorySummary => ({
     purchaseValue: 0,
@@ -497,6 +656,9 @@ export function processTransactions(
       totalTransactions: 0,
       fiscalYear: '',
       parseErrors,
+      chargesDetected,
+      totalChargesDeducted: 0,
+      totalSTT,
     };
   }
 
@@ -510,6 +672,8 @@ export function processTransactions(
     ltcg: emptyCat(),
     total: emptyCat(),
   };
+
+  let totalChargesDeducted = 0;
 
   for (const tx of classified) {
     let cat: CategorySummary;
@@ -526,6 +690,14 @@ export function processTransactions(
     overallSummary.total.saleValue += tx.saleValue;
     overallSummary.total.sellExpenses += tx.transferExpenses;
     overallSummary.total.gain += tx.capitalGain;
+
+    totalChargesDeducted += tx.transferExpenses + tx.purchaseExpenses;
+  }
+
+  // If charges came from individual columns, use the pre-computed total
+  // (avoids floating point drift from summing classified transactions)
+  if (chargesDetected && totalChargesFromColumns > 0) {
+    totalChargesDeducted = totalChargesFromColumns;
   }
 
   // Determine fiscal year from the first transaction's sell date
@@ -550,6 +722,9 @@ export function processTransactions(
     totalTransactions: classified.length,
     fiscalYear,
     parseErrors,
+    chargesDetected,
+    totalChargesDeducted,
+    totalSTT,
   };
 }
 

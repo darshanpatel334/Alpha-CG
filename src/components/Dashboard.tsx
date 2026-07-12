@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
-import { processTransactions, type ProcessingResult, DEFAULT_HOLDING_THRESHOLD } from '@/lib/taxEngine';
+import { processTransactions, distributeLumpSumCharges, type ProcessingResult, DEFAULT_HOLDING_THRESHOLD } from '@/lib/taxEngine';
 import { parseTSV, autoMapColumns, applyColumnMapping } from '@/lib/clipboardParser';
 import { UploadZone } from './UploadZone';
 import { PasteZone } from './PasteZone';
@@ -9,6 +9,7 @@ import { STTWarningBanner } from './STTWarningBanner';
 import { HoldingPeriodConfig } from './HoldingPeriodConfig';
 import { OverallSummaryCards } from './OverallSummaryCards';
 import { RawGainsTable } from './RawGainsTable';
+import { ChargesInput } from './ChargesInput';
 import { ExportButton } from './ExportButton';
 import { SaveReportModal } from './SaveReportModal';
 import { SavedReportsMenu } from './SavedReportsMenu';
@@ -45,6 +46,10 @@ export function Dashboard() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
+  // Lump-sum charges state
+  const [lumpSumCharges, setLumpSumCharges] = useState(0);
+  const [lumpSumApplied, setLumpSumApplied] = useState(false);
+
   // ─── Shared processing function ───
   const processRows = useCallback(
     (rows: Record<string, unknown>[]) => {
@@ -73,6 +78,9 @@ export function Dashboard() {
     totalTransactions: 0,
     fiscalYear: '',
     parseErrors: errors,
+    chargesDetected: false,
+    totalChargesDeducted: 0,
+    totalSTT: 0,
   });
 
   // ─── File upload handler ───
@@ -82,6 +90,8 @@ export function Dashboard() {
       setResult(null);
       setShowMapper(false);
       setPasteRowCount(null);
+      setLumpSumCharges(0);
+      setLumpSumApplied(false);
 
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -138,6 +148,8 @@ export function Dashboard() {
     (text: string) => {
       setIsProcessing(true);
       setResult(null);
+      setLumpSumCharges(0);
+      setLumpSumApplied(false);
 
       try {
         const { headers, rows, rawRowCount } = parseTSV(text);
@@ -209,6 +221,30 @@ export function Dashboard() {
     [rawRows]
   );
 
+  // ─── Lump-sum charges handler ───
+  const handleApplyLumpSum = useCallback(
+    (amount: number) => {
+      if (!rawRows) return;
+
+      if (amount <= 0) {
+        // Remove charges — reprocess original data
+        const processingResult = processTransactions(rawRows, holdingThreshold);
+        setResult(processingResult);
+        setLumpSumCharges(0);
+        setLumpSumApplied(false);
+        return;
+      }
+
+      // Distribute charges proportionally and reprocess
+      const chargedRows = distributeLumpSumCharges(rawRows, amount);
+      const processingResult = processTransactions(chargedRows, holdingThreshold);
+      setResult(processingResult);
+      setLumpSumCharges(amount);
+      setLumpSumApplied(true);
+    },
+    [rawRows, holdingThreshold]
+  );
+
   const handleSaveReport = (name: string, year: string) => {
     if (!result) return;
     saveReport(
@@ -233,11 +269,16 @@ export function Dashboard() {
       totalTransactions: report.totalTransactions,
       fiscalYear: report.fiscalYear,
       parseErrors: [],
+      chargesDetected: false,
+      totalChargesDeducted: 0,
+      totalSTT: 0,
     });
     setRawRows(null); // Clear input rows since loaded from saved state
     setIsProcessing(false);
     setShowMapper(false);
     setPasteRowCount(null);
+    setLumpSumCharges(0);
+    setLumpSumApplied(false);
   };
 
   const hasData = result && (result.transactions.length > 0 || !rawRows); // rawRows is null for loaded reports
@@ -381,6 +422,21 @@ export function Dashboard() {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {/* ─── Charges Input ─── */}
+        {hasData && rawRows && (
+          <section className="mb-6">
+            <ChargesInput
+              chargesDetected={result.chargesDetected}
+              totalChargesDeducted={result.totalChargesDeducted}
+              totalSTT={result.totalSTT}
+              totalTransactions={result.totalTransactions}
+              onApplyLumpSum={handleApplyLumpSum}
+              lumpSumApplied={lumpSumApplied}
+              appliedAmount={lumpSumCharges}
+            />
           </section>
         )}
 
