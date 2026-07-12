@@ -6,6 +6,7 @@ export type BankingCategory =
   | 'INTEREST' 
   | 'CASH_DEPOSIT' 
   | 'WITHDRAWAL' 
+  | 'INVESTMENT'
   | 'OTHER_CREDIT' 
   | 'UNKNOWN';
 
@@ -26,6 +27,7 @@ export interface BankingSummary {
   totalCashDeposit: number;
   totalOtherCredit: number;
   totalWithdrawal: number;
+  totalInvestment: number;
   totalTransactions: number;
 }
 
@@ -53,6 +55,9 @@ export function classifyBankTransaction(
   const text = desc.toUpperCase();
 
   if (withdrawal > 0) {
+    if (text.includes('INDIAN CLEARING CORP') || text.includes('MUTUAL FUND') || text.includes('SIP ') || text.includes('AMC')) {
+      return 'INVESTMENT';
+    }
     return 'WITHDRAWAL';
   }
 
@@ -60,7 +65,7 @@ export function classifyBankTransaction(
     if (text.includes('SALARY') || text.includes('PAYROLL') || text.includes('SAL ')) {
       return 'SALARY';
     }
-    if (text.includes('DIVIDEND') || text.includes('DIV ') || text.includes('ACH/DIV') || text.includes('ACH-DIV')) {
+    if (text.includes('DIVIDEND') || text.includes('DIV ') || text.includes('ACH/DIV') || text.includes('ACH-DIV') || (text.includes('ACH/') && !text.includes('INDIAN CLEARING CORP'))) {
       return 'DIVIDEND';
     }
     if (text.includes('INTEREST') || text.includes('INT.PD') || text.includes('SB INT') || text.includes('SAVING INT') || text.includes('INT-')) {
@@ -86,6 +91,7 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
     totalCashDeposit: 0,
     totalOtherCredit: 0,
     totalWithdrawal: 0,
+    totalInvestment: 0,
     totalTransactions: 0,
   };
 
@@ -134,6 +140,7 @@ export function processBankingTransactions(rows: Record<string, unknown>[]): Ban
     if (category === 'CASH_DEPOSIT') summary.totalCashDeposit += deposit;
     if (category === 'OTHER_CREDIT') summary.totalOtherCredit += deposit;
     if (category === 'WITHDRAWAL') summary.totalWithdrawal += withdrawal;
+    if (category === 'INVESTMENT') summary.totalInvestment += withdrawal;
   });
 
   summary.totalTransactions = transactions.length;

@@ -14,6 +14,7 @@ export function BankingTransactionsTable({ transactions }: BankingTransactionsTa
       case 'INTEREST': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
       case 'CASH_DEPOSIT': return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
       case 'WITHDRAWAL': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'INVESTMENT': return 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30';
       case 'OTHER_CREDIT': return 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30';
       default: return 'bg-zinc-800 text-zinc-400 border-zinc-700';
     }
