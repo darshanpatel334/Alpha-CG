@@ -181,12 +181,24 @@ export function applyColumnMapping(
   return rows.map((row) => {
     const mapped: Record<string, unknown> = {};
 
+    // Core fields
     if (mapping.buyDate) mapped['Buy_Date'] = row[mapping.buyDate];
     if (mapping.sellDate) mapped['Sell_Date'] = row[mapping.sellDate];
     if (mapping.purchaseValue) mapped['Purchase_Value'] = row[mapping.purchaseValue];
     if (mapping.saleValue) mapped['Sale_Value'] = row[mapping.saleValue];
     if (mapping.purchaseExpenses) mapped['Purchase_Expenses'] = row[mapping.purchaseExpenses];
     if (mapping.transferExpenses) mapped['Transfer_Expenses'] = row[mapping.transferExpenses];
+
+    // Zerodha-style individual charge columns (pass through with canonical names)
+    if (mapping.brokerage) mapped['Brokerage'] = row[mapping.brokerage];
+    if (mapping.exchangeTransactionCharges) mapped['Exchange Transaction Charges'] = row[mapping.exchangeTransactionCharges];
+    if (mapping.ipft) mapped['IPFT'] = row[mapping.ipft];
+    if (mapping.sebiCharges) mapped['SEBI Charges'] = row[mapping.sebiCharges];
+    if (mapping.cgst) mapped['CGST'] = row[mapping.cgst];
+    if (mapping.sgst) mapped['SGST'] = row[mapping.sgst];
+    if (mapping.igst) mapped['IGST'] = row[mapping.igst];
+    if (mapping.stampDuty) mapped['Stamp Duty'] = row[mapping.stampDuty];
+    if (mapping.stt) mapped['STT'] = row[mapping.stt];
 
     return mapped;
   });
