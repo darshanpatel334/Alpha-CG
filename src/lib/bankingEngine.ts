@@ -43,7 +43,8 @@ export interface BankingProcessingResult {
 function parseNumber(val: unknown): number {
   if (typeof val === 'number') return val;
   if (typeof val === 'string') {
-    const cleaned = val.replace(/,/g, '').trim();
+    const cleaned = val.replace(/[^\d.-]/g, '');
+    if (cleaned === '' || cleaned === '-' || cleaned === '.') return 0;
     const num = Number(cleaned);
     return isNaN(num) ? 0 : num;
   }

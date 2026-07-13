@@ -366,12 +366,11 @@ export function parseTransactions(
 }
 
 function parseNumber(value: unknown): number | null {
-  if (value == null || value === '') return null;
+  if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return isNaN(value) ? null : value;
   if (typeof value === 'string') {
-    // Remove commas, currency symbols, spaces
-    const cleaned = value.replace(/[₹,$\s,]/g, '').trim();
-    if (!cleaned) return null;
+    const cleaned = value.replace(/[^\d.-]/g, '');
+    if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
     const num = Number(cleaned);
     return isNaN(num) ? null : num;
   }
