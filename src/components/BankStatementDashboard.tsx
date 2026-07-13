@@ -70,7 +70,7 @@ export function BankStatementDashboard() {
         // Try auto-mapping
         const autoMapping = autoMapColumns(headers);
         // Minimum required mapping for banking
-        const requiredMapped = autoMapping.date && autoMapping.description;
+        const requiredMapped = autoMapping.date && autoMapping.description && autoMapping.withdrawal && autoMapping.deposit;
 
         if (requiredMapped) {
           const mappedRows = applyColumnMapping(rows, autoMapping);
@@ -185,8 +185,8 @@ export function BankStatementDashboard() {
             fields={[
               { key: 'date', label: 'Date', required: true },
               { key: 'description', label: 'Description/Narration', required: true },
-              { key: 'withdrawal', label: 'Withdrawal (Debit)', required: false },
-              { key: 'deposit', label: 'Deposit (Credit)', required: false },
+              { key: 'withdrawal', label: 'Withdrawal (Debit)', required: true },
+              { key: 'deposit', label: 'Deposit (Credit)', required: true },
               { key: 'balance', label: 'Balance', required: false },
             ]}
             detectedHeaders={pendingHeaders}

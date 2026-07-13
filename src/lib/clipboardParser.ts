@@ -140,10 +140,10 @@ export function autoMapColumns(
       'narration', 'description', 'particulars', 'remarks', 'transaction remarks',
     ],
     withdrawal: [
-      'withdrawal', 'debit', 'dr', 'dr amount', 'withdrawal amount', 'withdrawal amount inr', 'withdrawal amount (inr)',
+      'withdrawal', 'withdrawals', 'debit', 'debits', 'dr', 'dr amount', 'withdrawal amount', 'withdrawal amount inr', 'withdrawal amount (inr)', 'debit amount', 'amount (dr)',
     ],
     deposit: [
-      'deposit', 'credit', 'cr', 'cr amount', 'deposit amount', 'deposit amount inr', 'deposit amount (inr)',
+      'deposit', 'deposits', 'credit', 'credits', 'cr', 'cr amount', 'deposit amount', 'deposit amount inr', 'deposit amount (inr)', 'credit amount', 'amount (cr)',
     ],
     balance: [
       'balance', 'bal', 'balance inr', 'balance (inr)',
