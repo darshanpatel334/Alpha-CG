@@ -6,7 +6,6 @@ import { ColumnMapper } from './ColumnMapper';
 import { BankingSummaryCards } from './BankingSummaryCards';
 import { BankingTransactionsTable } from './BankingTransactionsTable';
 import { AlertCircle, Info, Database } from 'lucide-react';
-import { type MapperField } from './ColumnMapper';
 
 let datasetIdCounter = 0;
 
