@@ -1,6 +1,5 @@
 import { type ProcessingResult } from '@/lib/taxEngine';
 import { type BankingProcessingResult } from '@/lib/bankingEngine';
-import { type TISResult } from '@/lib/tisEngine';
 import { 
   Briefcase, 
   Landmark, 
@@ -10,17 +9,15 @@ import {
   Activity, 
   ArrowRightLeft,
   Banknote,
-  Receipt,
-  FileSearch,
+  Receipt
 } from 'lucide-react';
 
 interface AllDetailsDashboardProps {
   cgResult: ProcessingResult | null;
   bsResult: BankingProcessingResult | null;
-  tisResult?: TISResult | null;
 }
 
-export function AllDetailsDashboard({ cgResult, bsResult, tisResult }: AllDetailsDashboardProps) {
+export function AllDetailsDashboard({ cgResult, bsResult }: AllDetailsDashboardProps) {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -48,7 +45,7 @@ export function AllDetailsDashboard({ cgResult, bsResult, tisResult }: AllDetail
   const totalSalary = bsResult?.summary.totalSalary || 0;
 
   // Render a placeholder if no data is available at all
-  if (!cgResult && !bsResult && !tisResult) {
+  if (!cgResult && !bsResult) {
     return (
       <div className="mx-auto max-w-7xl px-6 py-20 flex flex-col items-center justify-center text-center animate-in fade-in-0 duration-500">
         <div className="h-16 w-16 bg-zinc-800/50 rounded-2xl flex items-center justify-center mb-4 border border-zinc-700/50">
@@ -56,7 +53,7 @@ export function AllDetailsDashboard({ cgResult, bsResult, tisResult }: AllDetail
         </div>
         <h2 className="text-xl font-bold text-zinc-200">No Data Available</h2>
         <p className="text-sm text-zinc-500 mt-2 max-w-md">
-          Please process some Capital Gains, Bank Statement, or TIS data in the other tabs to see your comprehensive financial overview here.
+          Please process some Capital Gains or Bank Statement data in the other tabs to see your comprehensive financial overview here.
         </p>
       </div>
     );
@@ -133,32 +130,6 @@ export function AllDetailsDashboard({ cgResult, bsResult, tisResult }: AllDetail
         </div>
       </div>
 
-      {/* TIS Summary Card (only when TIS data available) */}
-      {tisResult && tisResult.entries.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-violet-800/30 bg-violet-900/10 p-6 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-            <FileSearch className="w-24 h-24 text-violet-400" />
-          </div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-2 rounded-lg bg-violet-500/10">
-              <FileSearch className="w-5 h-5 text-violet-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-200">TIS Summary</h3>
-            <span className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">
-              {tisResult.entries.length} categories
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
-            {tisResult.entries.slice(0, 8).map(entry => (
-              <div key={entry.srNo} className="bg-zinc-900/60 rounded-lg p-3 border border-zinc-800/50">
-                <p className="text-[10px] text-zinc-500 mb-1 leading-tight">{entry.category}</p>
-                <p className="text-sm font-semibold text-zinc-200 font-mono">{formatCurrency(entry.acceptedByTaxpayer)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Cross-Domain Insights */}
       <h3 className="text-lg font-semibold text-zinc-200 mb-4 flex items-center gap-2">
         <Activity className="w-5 h-5 text-purple-400" />
@@ -213,4 +184,3 @@ export function AllDetailsDashboard({ cgResult, bsResult, tisResult }: AllDetail
     </main>
   );
 }
-
