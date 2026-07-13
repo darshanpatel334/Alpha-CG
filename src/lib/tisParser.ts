@@ -164,7 +164,19 @@ function parseTISItems(text: string): { items: TISLineItem[]; errors: string[] }
     errors.push('Could not parse any TIS line items from the PDF. The format may not be supported.');
   }
 
-  return { items, errors };
+  // Deduplicate: TIS PDFs often have the same table in Part A and Part B
+  const seen = new Map<string, TISLineItem>();
+  for (const item of items) {
+    const key = item.category.toLowerCase().trim();
+    if (!seen.has(key)) {
+      seen.set(key, item);
+    }
+  }
+  const dedupedItems = Array.from(seen.values());
+  // Re-number
+  dedupedItems.forEach((item, idx) => { item.srNo = idx + 1; });
+
+  return { items: dedupedItems, errors };
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────────

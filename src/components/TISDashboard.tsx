@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   parseTISPDF,
@@ -86,6 +86,25 @@ export function TISDashboard({ cgResult, bsResult }: TISDashboardProps) {
       setIsProcessing(false);
     }
   }, [cgResult, bsResult]);
+
+  // Re-run cross-reference reactively whenever CG/BS results change
+  useEffect(() => {
+    if (!result || result.lineItems.length === 0) return;
+    const cgSaleValue = cgResult?.overallSummary.total.saleValue || 0;
+    const cgPurchaseValue = cgResult?.overallSummary.total.purchaseValue || 0;
+    const bankInterestTotal = bsResult?.summary.totalInterest || 0;
+    const bankDividend = bsResult?.summary.totalDividend || 0;
+
+    const xref = crossReferenceTIS(
+      result.lineItems,
+      cgSaleValue,
+      cgPurchaseValue,
+      bankInterestTotal,
+      0,
+      bankDividend,
+    );
+    setMismatches(xref);
+  }, [cgResult, bsResult, result]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
