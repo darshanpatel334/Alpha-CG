@@ -6,6 +6,7 @@ import { ColumnMapper } from './ColumnMapper';
 import { BankingSummaryCards } from './BankingSummaryCards';
 import { BankingTransactionsTable } from './BankingTransactionsTable';
 import { AlertCircle, Info, Database } from 'lucide-react';
+import { type MapperField } from './ColumnMapper';
 
 let datasetIdCounter = 0;
 
@@ -182,6 +183,13 @@ export function BankStatementDashboard() {
         {/* Column Mapper */}
         {showMapper && (
           <ColumnMapper
+            fields={[
+              { key: 'date', label: 'Date', required: true },
+              { key: 'description', label: 'Description/Narration', required: true },
+              { key: 'withdrawal', label: 'Withdrawal (Debit)', required: false },
+              { key: 'deposit', label: 'Deposit (Credit)', required: false },
+              { key: 'balance', label: 'Balance', required: false },
+            ]}
             detectedHeaders={pendingHeaders}
             autoMapping={pendingAutoMapping}
             onConfirm={handleMappingConfirmed}
@@ -222,6 +230,22 @@ export function BankStatementDashboard() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+          {result && result.transactions.length === 0 && !showPasteInput && (
+            <div className="mt-4">
+              <button 
+                onClick={() => {
+                  setResult(null);
+                  setActiveCategory(null);
+                  setPasteDatasets([]);
+                  setActiveTab('ALL');
+                  setShowPasteInput(true);
+                }}
+                className="px-4 py-2 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-md text-sm transition-colors border border-zinc-700"
+              >
+                Reset & Try Again
+              </button>
             </div>
           )}
         </section>

@@ -1,23 +1,22 @@
 import { useState, useCallback, useMemo } from 'react';
 import { ArrowRight, Check, AlertCircle, Link2 } from 'lucide-react';
 
+export interface MapperField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
 interface ColumnMapperProps {
+  fields: readonly MapperField[];
   detectedHeaders: string[];
   autoMapping: Record<string, string | null>;
   onConfirm: (mapping: Record<string, string | null>) => void;
   onCancel: () => void;
 }
 
-const REQUIRED_FIELDS = [
-  { key: 'buyDate', label: 'Buy Date', required: true },
-  { key: 'sellDate', label: 'Sell Date', required: true },
-  { key: 'purchaseValue', label: 'Purchase Value', required: true },
-  { key: 'saleValue', label: 'Sale Value', required: true },
-  { key: 'purchaseExpenses', label: 'Purchase Expenses', required: false },
-  { key: 'transferExpenses', label: 'Transfer Expenses', required: false },
-] as const;
-
 export function ColumnMapper({
+  fields,
   detectedHeaders,
   autoMapping,
   onConfirm,
@@ -38,14 +37,16 @@ export function ColumnMapper({
   );
 
   const requiredFieldsMapped = useMemo(() => {
-    return REQUIRED_FIELDS.filter((f) => f.required).every(
+    return fields.filter((f) => f.required).every(
       (f) => mapping[f.key] != null
     );
-  }, [mapping]);
+  }, [mapping, fields]);
 
   const autoMappedCount = useMemo(() => {
-    return Object.values(autoMapping).filter((v) => v != null).length;
-  }, [autoMapping]);
+    // Only count fields that are part of our expected fields
+    const fieldKeys = new Set(fields.map(f => f.key));
+    return Object.entries(autoMapping).filter(([k, v]) => fieldKeys.has(k) && v != null).length;
+  }, [autoMapping, fields]);
 
   const handleConfirm = useCallback(() => {
     if (requiredFieldsMapped) {
@@ -63,13 +64,13 @@ export function ColumnMapper({
             <h3 className="text-sm font-semibold text-zinc-200">Map Columns</h3>
             <p className="text-[10px] text-zinc-500 mt-0.5">
               {autoMappedCount > 0
-                ? `${autoMappedCount} of ${REQUIRED_FIELDS.length} fields auto-detected`
+                ? `${autoMappedCount} of ${fields.length} fields auto-detected`
                 : 'Select which column matches each field'}
             </p>
           </div>
         </div>
 
-        {autoMappedCount === REQUIRED_FIELDS.length && (
+        {autoMappedCount === fields.length && (
           <span className="text-[10px] font-medium text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded flex items-center gap-1">
             <Check className="h-3 w-3" />
             All fields matched
@@ -79,7 +80,7 @@ export function ColumnMapper({
 
       {/* Mapping grid */}
       <div className="px-5 py-4 space-y-3">
-        {REQUIRED_FIELDS.map((field) => {
+        {fields.map((field) => {
           const isMatched = mapping[field.key] != null;
           const wasAutoMatched = autoMapping[field.key] != null;
 

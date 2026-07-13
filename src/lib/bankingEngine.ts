@@ -140,8 +140,13 @@ export function processBankingTransactions(datasets: { id: number; sourceName: s
 
       const category = classifyBankTransaction(description, withdrawal, deposit);
 
+      // crypto.randomUUID is undefined in non-secure contexts (e.g. HTTP on local network)
+      const txId = typeof crypto !== 'undefined' && crypto.randomUUID 
+        ? crypto.randomUUID() 
+        : 'tx-' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
       const tx: BankTransaction = {
-        id: crypto.randomUUID(),
+        id: txId,
         datasetId: dataset.id,
         sourceName: dataset.sourceName,
         date,
@@ -158,6 +163,10 @@ export function processBankingTransactions(datasets: { id: number; sourceName: s
   });
 
   const summary = recalculateBankingSummary(transactions);
+
+  if (transactions.length === 0 && parseErrors.length === 0) {
+    parseErrors.push("No valid banking transactions found. Ensure Deposit/Withdrawal columns are mapped and contain numbers.");
+  }
 
   return {
     transactions,

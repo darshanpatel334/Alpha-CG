@@ -322,6 +322,14 @@ export function CapitalGainsDashboard() {
           {/* Column Mapper */}
           {showMapper && (
             <ColumnMapper
+              fields={[
+                { key: 'buyDate', label: 'Buy Date', required: true },
+                { key: 'sellDate', label: 'Sell Date', required: true },
+                { key: 'purchaseValue', label: 'Purchase Value', required: true },
+                { key: 'saleValue', label: 'Sale Value', required: true },
+                { key: 'purchaseExpenses', label: 'Purchase Expenses', required: false },
+                { key: 'transferExpenses', label: 'Transfer Expenses', required: false },
+              ]}
               detectedHeaders={pendingHeaders}
               autoMapping={pendingAutoMapping}
               onConfirm={handleMappingConfirmed}
