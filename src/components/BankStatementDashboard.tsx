@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { parseTSV, autoMapColumns, applyColumnMapping } from '@/lib/clipboardParser';
 import { processBankingTransactions, recalculateBankingSummary, type BankingProcessingResult } from '@/lib/bankingEngine';
 import { PasteZone } from './PasteZone';
@@ -16,9 +16,20 @@ export interface PasteDataset {
   rows: Record<string, unknown>[];
 }
 
-export function BankStatementDashboard() {
+export interface BankStatementDashboardProps {
+  onResultChange?: (result: BankingProcessingResult | null) => void;
+}
+
+export function BankStatementDashboard({ onResultChange }: BankStatementDashboardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<BankingProcessingResult | null>(null);
+
+  useEffect(() => {
+    if (onResultChange) {
+      onResultChange(result);
+    }
+  }, [result, onResultChange]);
+
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   
   // Multi-dataset state

@@ -36,9 +36,20 @@ interface PasteDataset {
 
 let datasetIdCounter = 0;
 
-export function CapitalGainsDashboard() {
+export interface CapitalGainsDashboardProps {
+  onResultChange?: (result: ProcessingResult | null) => void;
+}
+
+export function CapitalGainsDashboard({ onResultChange }: CapitalGainsDashboardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ProcessingResult | null>(null);
+
+  React.useEffect(() => {
+    if (onResultChange) {
+      onResultChange(result);
+    }
+  }, [result, onResultChange]);
+
   const [holdingThreshold, setHoldingThreshold] = useState(DEFAULT_HOLDING_THRESHOLD);
   const [rawRows, setRawRows] = useState<Record<string, unknown>[] | null>(null);
 

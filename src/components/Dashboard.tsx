@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { CapitalGainsDashboard } from './CapitalGainsDashboard';
 import { BankStatementDashboard } from './BankStatementDashboard';
-import { BarChart3, Landmark } from 'lucide-react';
+import { AllDetailsDashboard } from './AllDetailsDashboard';
+import { BarChart3, Landmark, Activity } from 'lucide-react';
+import { type ProcessingResult } from '@/lib/taxEngine';
+import { type BankingProcessingResult } from '@/lib/bankingEngine';
 
-type Tab = 'capitalGains' | 'bankStatement';
+type Tab = 'capitalGains' | 'bankStatement' | 'allDetails';
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('capitalGains');
+  const [cgResult, setCgResult] = useState<ProcessingResult | null>(null);
+  const [bsResult, setBsResult] = useState<BankingProcessingResult | null>(null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,12 +56,36 @@ export function Dashboard() {
               <Landmark className="h-3.5 w-3.5" strokeWidth={1.5} />
               Bank Statement
             </button>
+            <button
+              onClick={() => setActiveTab('allDetails')}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
+                activeTab === 'allDetails'
+                  ? 'bg-zinc-800 text-zinc-200 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
+              ALL Details
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Render Active Dashboard */}
-      {activeTab === 'capitalGains' ? <CapitalGainsDashboard /> : <BankStatementDashboard />}
+      {/* 
+        Render Active Dashboards side-by-side and hide inactive ones.
+        This preserves their internal React state (data doesn't clear on tab switch).
+      */}
+      <div className={activeTab === 'capitalGains' ? 'block' : 'hidden'}>
+        <CapitalGainsDashboard onResultChange={setCgResult} />
+      </div>
+      
+      <div className={activeTab === 'bankStatement' ? 'block' : 'hidden'}>
+        <BankStatementDashboard onResultChange={setBsResult} />
+      </div>
+
+      <div className={activeTab === 'allDetails' ? 'block' : 'hidden'}>
+        <AllDetailsDashboard cgResult={cgResult} bsResult={bsResult} />
+      </div>
     </div>
   );
 }
