@@ -46,7 +46,7 @@ export interface AggregatedHolding {
 export function getStockGroupingKey(name: string): string {
   return name
     .toLowerCase()
-    .replace(/\b(ltd\.?|limited|eq|equity)\b/g, '') // remove common suffixes
+    .replace(/\b(ltd\.?|limited|limite|eq|equity|tech|technology|technologies|ind|india)\b/g, '') // remove common suffixes
     .replace(/&/g, 'and')                           // normalize ampersand
     .replace(/[^a-z0-9]/g, '');                     // remove spaces and special chars
 }

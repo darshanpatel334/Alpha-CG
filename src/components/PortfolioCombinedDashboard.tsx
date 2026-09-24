@@ -15,7 +15,9 @@ import {
   Plus,
   ChevronUp,
   ChevronDown,
-  ArrowUpDown
+  ArrowUpDown,
+  SplitSquareHorizontal,
+  Merge
 } from 'lucide-react';
 
 interface PortfolioCombinedDashboardProps {
@@ -152,6 +154,28 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
       setShowAdd(false);
       setAddName('');
       setAddValue('');
+      if (onRefresh) onRefresh();
+    }
+  };
+
+  const handleSeparate = (b: AggregatedHoldingBreakdown) => {
+    const newName = window.prompt("Enter a new unique name to separate this holding:", `${b.holding.stockName} (Separate)`);
+    if (newName && newName.trim() && newName.trim() !== b.holding.stockName) {
+      updateHolding(b.individualId, { ...b.holding, stockName: newName.trim() });
+      if (onRefresh) onRefresh();
+    }
+  };
+
+  const [showMerge, setShowMerge] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState('');
+
+  const handleMergeGroup = () => {
+    if (mergeTarget && selectedAggregated) {
+      selectedAggregated.breakdown.forEach((b) => {
+        updateHolding(b.individualId, { ...b.holding, stockName: mergeTarget });
+      });
+      setShowMerge(false);
+      closeModal();
       if (onRefresh) onRefresh();
     }
   };
@@ -504,10 +528,13 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
                               </>
                             ) : (
                               <>
-                                <button onClick={() => handleStartEdit(b)} className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800">
+                                <button title="Edit" onClick={() => handleStartEdit(b)} className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800">
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                                <button onClick={() => handleRemoveHolding(b)} className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10">
+                                <button title="Separate this entry" onClick={() => handleSeparate(b)} className="p-1 rounded text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10">
+                                  <SplitSquareHorizontal className="w-3.5 h-3.5" />
+                                </button>
+                                <button title="Delete" onClick={() => handleRemoveHolding(b)} className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </>
@@ -520,58 +547,94 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
                 </table>
               </div>
 
-              {!showAdd ? (
-                <button
-                  onClick={() => handleStartAdd(selectedAggregated.stockName)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
-                >
-                  <Plus className="w-4 h-4" /> Add entry to this group
-                </button>
-              ) : (
-                <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4 animate-in fade-in slide-in-from-top-2">
-                  <h4 className="text-xs font-semibold text-zinc-300 mb-3">Add Holding</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Individual</label>
-                      <select
-                        value={addIndId}
-                        onChange={(e) => setAddIndId(e.target.value)}
-                        className="w-full rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      >
-                        {individuals.map(i => (
-                          <option key={i.id} value={i.id}>{i.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Stock Name</label>
-                      <input
-                        type="text"
-                        value={addName}
-                        onChange={(e) => setAddName(e.target.value)}
-                        className="w-full rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Value (₹)</label>
-                      <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                {!showAdd ? (
+                  <button
+                    onClick={() => handleStartAdd(selectedAggregated.stockName)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors w-fit"
+                  >
+                    <Plus className="w-4 h-4" /> Add entry to this group
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4 animate-in fade-in slide-in-from-top-2">
+                    <h4 className="text-xs font-semibold text-zinc-300 mb-3">Add Holding</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Individual</label>
+                        <select
+                          value={addIndId}
+                          onChange={(e) => setAddIndId(e.target.value)}
+                          className="w-full rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                        >
+                          {individuals.map(i => (
+                            <option key={i.id} value={i.id}>{i.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Stock Name</label>
                         <input
-                          type="number"
-                          value={addValue}
-                          onChange={(e) => setAddValue(e.target.value)}
-                          className="flex-1 rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                          type="text"
+                          value={addName}
+                          onChange={(e) => setAddName(e.target.value)}
+                          className="w-full rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
                         />
-                        <button onClick={handleSaveAdd} className="px-3 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setShowAdd(false)} className="px-3 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 border border-transparent">
-                          <X className="w-4 h-4" />
-                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Value (₹)</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={addValue}
+                            onChange={(e) => setAddValue(e.target.value)}
+                            className="flex-1 rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                          />
+                          <button onClick={handleSaveAdd} className="px-3 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setShowAdd(false)} className="px-3 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 border border-transparent">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {!showMerge ? (
+                  <button
+                    onClick={() => setShowMerge(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 px-4 py-2 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition-colors w-fit"
+                  >
+                    <Merge className="w-4 h-4" /> Combine with other entries
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4 animate-in fade-in slide-in-from-top-2">
+                    <h4 className="text-xs font-semibold text-zinc-300 mb-3">Merge Group Into...</h4>
+                    <div className="flex gap-3">
+                      <select
+                        value={mergeTarget}
+                        onChange={(e) => setMergeTarget(e.target.value)}
+                        className="flex-1 rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-purple-500"
+                      >
+                        <option value="">Select target group...</option>
+                        {aggregated
+                          .filter(a => a.groupKey !== selectedAggregated.groupKey)
+                          .sort((a, b) => a.stockName.localeCompare(b.stockName))
+                          .map(a => (
+                            <option key={a.groupKey} value={a.stockName}>{a.stockName} ({a.breakdown.length} entries)</option>
+                          ))}
+                      </select>
+                      <button onClick={handleMergeGroup} disabled={!mergeTarget} className="px-3 rounded-md bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 flex items-center justify-center border border-purple-500/20 disabled:opacity-50">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setShowMerge(false)} className="px-3 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 border border-transparent">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
