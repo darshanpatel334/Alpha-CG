@@ -3,8 +3,6 @@ import {
   Briefcase,
   UserPlus,
   PieChart,
-  Users,
-  Search,
 } from 'lucide-react';
 import {
   getIndividuals,
@@ -17,13 +15,12 @@ import { PortfolioAddIndividualModal } from './PortfolioAddIndividualModal';
 import { PortfolioIndividualCard } from './PortfolioIndividualCard';
 import { PortfolioCombinedDashboard } from './PortfolioCombinedDashboard';
 
-type PortfolioView = 'individuals' | 'combined';
+type PortfolioTab = 'combined' | string; // 'combined' or individual id
 
 export function PortfolioDashboard() {
   const [individuals, setIndividuals] = useState<Individual[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeView, setActiveView] = useState<PortfolioView>('individuals');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<PortfolioTab>('combined');
 
   // Load individuals from localStorage
   const loadIndividuals = useCallback(() => {
@@ -39,6 +36,7 @@ export function PortfolioDashboard() {
       const individual = createIndividual(name, email, phone);
       saveIndividual(individual);
       loadIndividuals();
+      setActiveTab(individual.id); // Switch to newly created tab
     },
     [loadIndividuals]
   );
@@ -49,13 +47,12 @@ export function PortfolioDashboard() {
       if (ind && window.confirm(`Delete ${ind.name} and all their holdings?`)) {
         deleteIndividual(id);
         loadIndividuals();
+        if (activeTab === id) {
+          setActiveTab('combined');
+        }
       }
     },
-    [individuals, loadIndividuals]
-  );
-
-  const filteredIndividuals = individuals.filter((ind) =>
-    ind.name.toLowerCase().includes(searchQuery.toLowerCase())
+    [individuals, loadIndividuals, activeTab]
   );
 
   const totalHoldings = individuals.reduce((sum, ind) => sum + ind.holdings.length, 0);
@@ -70,6 +67,8 @@ export function PortfolioDashboard() {
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(val);
+
+  const activeIndividual = individuals.find(i => i.id === activeTab);
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
@@ -113,24 +112,13 @@ export function PortfolioDashboard() {
         </div>
       )}
 
-      {/* Sub-navigation */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="flex bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
+      {/* Dynamic Tabs Navigation */}
+      <div className="mb-6 flex overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-800">
+        <div className="flex bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50 min-w-max">
           <button
-            onClick={() => setActiveView('individuals')}
+            onClick={() => setActiveTab('combined')}
             className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
-              activeView === 'individuals'
-                ? 'bg-zinc-800 text-zinc-200 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-400'
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Individuals
-          </button>
-          <button
-            onClick={() => setActiveView('combined')}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
-              activeView === 'combined'
+              activeTab === 'combined'
                 ? 'bg-zinc-800 text-zinc-200 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-400'
             }`}
@@ -138,67 +126,39 @@ export function PortfolioDashboard() {
             <PieChart className="h-3.5 w-3.5" strokeWidth={1.5} />
             Combined Dashboard
           </button>
+          
+          {individuals.map((ind) => (
+            <button
+              key={ind.id}
+              onClick={() => setActiveTab(ind.id)}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
+                activeTab === ind.id
+                  ? 'bg-zinc-800 text-zinc-200 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+            >
+              <div className="flex h-4 w-4 items-center justify-center rounded bg-blue-500/20 text-[9px] font-bold text-blue-400">
+                {ind.name.charAt(0).toUpperCase()}
+              </div>
+              {ind.name}
+            </button>
+          ))}
         </div>
-
-        {activeView === 'individuals' && individuals.length > 0 && (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search individuals..."
-              className="pl-9 pr-4 py-2 rounded-lg border border-zinc-800/50 bg-zinc-900/30 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-zinc-700 focus:bg-zinc-900/50 transition-all w-56"
-            />
-          </div>
-        )}
       </div>
 
-      {/* Individuals View */}
-      {activeView === 'individuals' && (
-        <>
-          {individuals.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="h-16 w-16 bg-zinc-800/50 rounded-2xl flex items-center justify-center mb-4 border border-zinc-700/50">
-                <Users className="h-8 w-8 text-zinc-500" strokeWidth={1.5} />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-200">No Individuals Yet</h3>
-              <p className="text-sm text-zinc-500 mt-2 max-w-md">
-                Start by adding individuals to manage their portfolio holdings.
-                You can import holdings from Excel, PDF, or paste directly.
-              </p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-500/10 border border-blue-500/20 px-5 py-2.5 text-sm font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
-              >
-                <UserPlus className="h-4 w-4" />
-                Add Your First Individual
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredIndividuals.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-sm text-zinc-500">No individuals match "{searchQuery}"</p>
-                </div>
-              ) : (
-                filteredIndividuals.map((individual) => (
-                  <PortfolioIndividualCard
-                    key={individual.id}
-                    individual={individual}
-                    onDelete={handleDeleteIndividual}
-                    onRefresh={loadIndividuals}
-                  />
-                ))
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Combined Dashboard View */}
-      {activeView === 'combined' && (
+      {/* Tab Content */}
+      {activeTab === 'combined' ? (
         <PortfolioCombinedDashboard individuals={individuals} />
+      ) : activeIndividual ? (
+        <PortfolioIndividualCard
+          individual={activeIndividual}
+          onDelete={handleDeleteIndividual}
+          onRefresh={loadIndividuals}
+        />
+      ) : (
+        <div className="py-12 text-center">
+          <p className="text-sm text-zinc-500">Individual not found.</p>
+        </div>
       )}
 
       {/* Add Individual Modal */}
