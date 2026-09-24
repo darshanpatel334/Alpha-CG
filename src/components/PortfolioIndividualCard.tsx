@@ -10,6 +10,9 @@ import {
   Mail,
   Phone,
   Clock,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown
 } from 'lucide-react';
 import type { Individual, HoldingEntry } from '@/lib/portfolioStorage';
 import { removeHolding, updateHolding, addHoldings, clearHoldings, createHolding } from '@/lib/portfolioStorage';
@@ -30,7 +33,40 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
   const [manualName, setManualName] = useState('');
   const [manualValue, setManualValue] = useState('');
 
+  type SortKey = 'stockName' | 'currentValue';
+  const [sortKey, setSortKey] = useState<SortKey>('currentValue');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   const totalValue = individual.holdings.reduce((sum, h) => sum + h.currentValue, 0);
+
+  const sortedHoldings = [...individual.holdings].sort((a, b) => {
+    let valA, valB;
+    if (sortKey === 'stockName') {
+      valA = a.stockName.toLowerCase();
+      valB = b.stockName.toLowerCase();
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    } else {
+      valA = a.currentValue;
+      valB = b.currentValue;
+      return sortDir === 'asc' ? valA - valB : valB - valA;
+    }
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40 group-hover:opacity-100" />;
+    return sortDir === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-blue-400" /> : <ChevronDown className="w-3 h-3 ml-1 text-blue-400" />;
+  };
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-IN', {
@@ -228,16 +264,29 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
               <thead>
                 <tr className="text-[10px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800/40">
                   <th className="text-left px-5 py-3 font-medium">#</th>
-                  <th className="text-left px-5 py-3 font-medium">Stock Name</th>
-                  <th className="text-right px-5 py-3 font-medium">Current Value</th>
-                  <th className="text-right px-5 py-3 font-medium">% of Total</th>
+                  <th 
+                    className="text-left px-5 py-3 font-medium cursor-pointer group hover:text-zinc-300"
+                    onClick={() => handleSort('stockName')}
+                  >
+                    <div className="flex items-center">Stock Name <SortIcon columnKey="stockName" /></div>
+                  </th>
+                  <th 
+                    className="text-right px-5 py-3 font-medium cursor-pointer group hover:text-zinc-300"
+                    onClick={() => handleSort('currentValue')}
+                  >
+                    <div className="flex items-center justify-end">Current Value <SortIcon columnKey="currentValue" /></div>
+                  </th>
+                  <th 
+                    className="text-right px-5 py-3 font-medium cursor-pointer group hover:text-zinc-300"
+                    onClick={() => handleSort('currentValue')}
+                  >
+                    <div className="flex items-center justify-end">% of Total <SortIcon columnKey="currentValue" /></div>
+                  </th>
                   <th className="text-right px-5 py-3 font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {individual.holdings
-                  .sort((a, b) => b.currentValue - a.currentValue)
-                  .map((holding, idx) => (
+                {sortedHoldings.map((holding, idx) => (
                     <tr
                       key={holding.id}
                       className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors"
