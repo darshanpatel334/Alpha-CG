@@ -188,6 +188,87 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
         </div>
       </div>
 
+      {/* Individual Contributions AUM Table */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+        <div className="px-5 py-4 border-b border-zinc-800/50">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-zinc-400" />
+            <h4 className="text-sm font-semibold text-zinc-200">Individual Contributions (AUM)</h4>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800/40">
+                <th className="text-left px-5 py-2.5 font-medium">#</th>
+                <th className="text-left px-5 py-2.5 font-medium">Individual Name</th>
+                <th className="text-right px-5 py-2.5 font-medium">Total Value</th>
+                <th className="text-right px-5 py-2.5 font-medium">% of Total AUM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {individuals
+                .filter((i) => i.holdings.length > 0)
+                .sort((a, b) => {
+                  const aTotal = a.holdings.reduce((s, h) => s + h.currentValue, 0);
+                  const bTotal = b.holdings.reduce((s, h) => s + h.currentValue, 0);
+                  return bTotal - aTotal;
+                })
+                .map((ind, idx) => {
+                  const indTotal = ind.holdings.reduce((s, h) => s + h.currentValue, 0);
+                  const pct = grandTotal > 0 ? (indTotal / grandTotal) * 100 : 0;
+                  return (
+                    <tr key={ind.id} className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors">
+                      <td className="px-5 py-3 text-xs text-zinc-600 tabular-nums">{idx + 1}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/20 text-blue-400 font-bold text-[10px] shrink-0">
+                            {ind.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="text-xs font-medium text-zinc-300">{ind.name}</span>
+                            <span className="ml-2 text-[10px] text-zinc-600">({ind.holdings.length} stocks)</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <span className="text-xs text-zinc-300 tabular-nums font-semibold">{formatCurrency(indTotal)}</span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 bg-zinc-800/60 rounded-full overflow-hidden hidden sm:block">
+                            <div
+                              className="h-full bg-purple-500/60 rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-500 tabular-nums w-12 text-right">
+                            {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-zinc-900/60">
+                <td className="px-5 py-4" />
+                <td className="px-5 py-4">
+                  <span className="text-xs font-semibold text-zinc-300">Total AUM</span>
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <span className="text-sm font-bold text-emerald-400 tabular-nums">{formatCurrency(grandTotal)}</span>
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <span className="text-xs font-semibold text-zinc-400">100.0%</span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-800/50">
           <div className="flex items-center gap-2">
