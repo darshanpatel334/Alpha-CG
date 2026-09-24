@@ -167,36 +167,6 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="w-4 h-4 text-zinc-400" />
-          <h4 className="text-sm font-semibold text-zinc-200">Top Holdings by Value</h4>
-        </div>
-        <div className="space-y-3">
-          {top10.map((stock, idx) => (
-            <div key={stock.groupKey} className="group cursor-pointer" onClick={() => openModal(stock)}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-300 font-medium truncate max-w-[50%] group-hover:text-blue-400 transition-colors">
-                  {stock.stockName}
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-400 tabular-nums">{formatCurrency(stock.totalValue)}</span>
-                  <span className="text-[10px] text-zinc-500 tabular-nums w-12 text-right">
-                    {stock.percentOfTotal.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-              <div className="h-2 bg-zinc-800/60 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ease-out ${barColors[idx % barColors.length]}`}
-                  style={{ width: `${(stock.totalValue / maxValue) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Individual Contributions AUM Table */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-800/50">
@@ -283,6 +253,36 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
         </div>
       </div>
 
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-4 h-4 text-zinc-400" />
+          <h4 className="text-sm font-semibold text-zinc-200">Top Holdings by Value</h4>
+        </div>
+        <div className="space-y-3">
+          {top10.map((stock, idx) => (
+            <div key={stock.groupKey} className="group cursor-pointer" onClick={() => openModal(stock)}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-zinc-300 font-medium truncate max-w-[50%] group-hover:text-blue-400 transition-colors">
+                  {stock.stockName}
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-400 tabular-nums">{formatCurrency(stock.totalValue)}</span>
+                  <span className="text-[10px] text-zinc-500 tabular-nums w-12 text-right">
+                    {stock.percentOfTotal.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              <div className="h-2 bg-zinc-800/60 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ease-out ${barColors[idx % barColors.length]}`}
+                  style={{ width: `${(stock.totalValue / maxValue) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-800/50">
           <div className="flex items-center gap-2">
@@ -297,6 +297,7 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
               <tr className="text-[10px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800/40">
                 <th className="text-left px-5 py-2.5 font-medium">#</th>
                 <th className="text-left px-5 py-2.5 font-medium">Stock Name</th>
+                <th className="text-center px-5 py-2.5 font-medium">Entries</th>
                 <th className="text-right px-5 py-2.5 font-medium">Total Value</th>
                 <th className="text-right px-5 py-2.5 font-medium">% of Total</th>
                 <th className="text-center px-5 py-2.5 font-medium w-24">Actions</th>
@@ -311,7 +312,9 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
                   <td className="px-5 py-3 text-xs text-zinc-600 tabular-nums">{idx + 1}</td>
                   <td className="px-5 py-3">
                     <span className="text-xs font-medium text-zinc-300">{stock.stockName}</span>
-                    <span className="ml-2 text-[10px] text-zinc-600">({stock.breakdown.length} entries)</span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <span className="text-xs text-zinc-500 tabular-nums">{stock.breakdown.length}</span>
                   </td>
                   <td className="px-5 py-3 text-right">
                     <span className="text-xs text-zinc-300 tabular-nums font-semibold">{formatCurrency(stock.totalValue)}</span>
@@ -345,6 +348,9 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
                 <td className="px-5 py-4" />
                 <td className="px-5 py-4">
                   <span className="text-xs font-semibold text-zinc-300">Grand Total</span>
+                </td>
+                <td className="px-5 py-4 text-center">
+                  <span className="text-xs text-zinc-500 tabular-nums">{aggregated.length} groups</span>
                 </td>
                 <td className="px-5 py-4 text-right">
                   <span className="text-sm font-bold text-emerald-400 tabular-nums">{formatCurrency(grandTotal)}</span>
