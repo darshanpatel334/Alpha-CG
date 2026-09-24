@@ -1,0 +1,14 @@
+{
+  "name": "LifeNivesh Fund Management",
+  "short_name": "LifeNivesh",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#09090b",
+  "background_color": "#09090b",
+  "display": "standalone"
+}

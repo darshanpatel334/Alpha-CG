@@ -1,6 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="6" fill="#09090B"/>
-  <rect x="0.5" y="0.5" width="31" height="31" rx="5.5" stroke="#3F3F46" stroke-opacity="0.5"/>
-  <path d="M8 22L13.5 10H15.5L21 22H18.8L17.6 19H11.4L10.2 22H8ZM12.1 17.2H16.9L14.5 11.8L12.1 17.2Z" fill="#3B82F6"/>
-  <path d="M21 22L24 16L21 10" stroke="#3B82F6" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#09090b" />
+  <path d="M120 360 L220 240 L300 290 L400 160" stroke="url(#grad)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#shadow)" />
+  <circle cx="400" cy="160" r="28" fill="#10b981" filter="url(#shadow)" />
+  <circle cx="120" cy="360" r="24" fill="#3b82f6" filter="url(#shadow)" />
 </svg>
