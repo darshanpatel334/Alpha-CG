@@ -16,47 +16,19 @@ export interface PortfolioHolding {
 // Column-name matching helpers
 // ---------------------------------------------------------------------------
 
-/** Lowercase patterns that identify a stock-name column. */
+/** Lowercase patterns that identify a stock-name column (strict). */
 const STOCK_NAME_PATTERNS = [
-  'instrument name',
   'stock name',
-  'scrip name',
-  'company name',
-  'fund name',
-  'scheme name',
-  'isin name',
+  'stock list',
   'instruments',
-  'instrument',
-  'holdings',
-  'stock',
-  'scrip',
-  'company',
-  'equity',
-  'name',
-  'symbol',
-  'security',
+  'stocks',
 ];
 
-/** Lowercase patterns that identify a value column. */
+/** Lowercase patterns that identify a value column (strict). */
 const VALUE_PATTERNS = [
   'value at market price',
-  'current market value',
   'current value',
   'closing value',
-  'close value',
-  'market value',
-  'present value',
-  'latest value',
-  'portfolio value',
-  'nav value',
-  'ltp value',
-  'valuation',
-  'cur. val',
-  'current val',
-  'mkt value',
-  'mkt val',
-  'value',
-  'amount',
 ];
 
 /**
@@ -64,10 +36,10 @@ const VALUE_PATTERNS = [
  * patterns. Longer patterns are checked first so "stock name" wins over
  * "stock".
  */
-function matchesPattern(header: string, patterns: string[]): boolean {
-  const h = header.toLowerCase().trim();
-  return patterns.some((p) => h === p || h.includes(p));
-}
+// function matchesPattern(header: string, patterns: string[]): boolean {
+//   const h = header.toLowerCase().trim();
+//   return patterns.some((p) => h === p || h.includes(p));
+// }
 
 /**
  * Given an array of header strings, return the indices of the stock-name

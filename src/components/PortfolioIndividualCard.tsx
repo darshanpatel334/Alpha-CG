@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  User,
   Trash2,
   ChevronDown,
   ChevronUp,
