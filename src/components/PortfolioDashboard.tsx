@@ -148,7 +148,11 @@ export function PortfolioDashboard() {
 
       {/* Tab Content */}
       {activeTab === 'combined' ? (
-        <PortfolioCombinedDashboard individuals={individuals} onRefresh={loadIndividuals} />
+        <PortfolioCombinedDashboard 
+          individuals={individuals} 
+          onRefresh={loadIndividuals} 
+          onNavigateToIndividual={(id) => setActiveTab(id)}
+        />
       ) : activeIndividual ? (
         <PortfolioIndividualCard
           individual={activeIndividual}

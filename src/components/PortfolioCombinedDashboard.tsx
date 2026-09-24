@@ -21,9 +21,10 @@ import {
 interface PortfolioCombinedDashboardProps {
   individuals: Individual[];
   onRefresh?: () => void;
+  onNavigateToIndividual?: (id: string) => void;
 }
 
-export function PortfolioCombinedDashboard({ individuals, onRefresh }: PortfolioCombinedDashboardProps) {
+export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateToIndividual }: PortfolioCombinedDashboardProps) {
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -236,7 +237,11 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
                   const indTotal = ind.holdings.reduce((s, h) => s + h.currentValue, 0);
                   const pct = grandTotal > 0 ? (indTotal / grandTotal) * 100 : 0;
                   return (
-                    <tr key={ind.id} className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors">
+                    <tr 
+                      key={ind.id} 
+                      onClick={() => onNavigateToIndividual?.(ind.id)}
+                      className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors cursor-pointer group"
+                    >
                       <td className="px-5 py-3 text-xs text-zinc-600 tabular-nums">{idx + 1}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
