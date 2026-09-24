@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Mail,
   Phone,
+  Clock,
 } from 'lucide-react';
 import type { Individual, HoldingEntry } from '@/lib/portfolioStorage';
 import { removeHolding, updateHolding, addHoldings, clearHoldings, createHolding } from '@/lib/portfolioStorage';
@@ -37,6 +38,15 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(val);
+
+  const formatDate = (ts: number) =>
+    new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(ts));
 
   const handleHoldingsParsed = (holdings: { stockName: string; currentValue: number }[]) => {
     const newHoldings: HoldingEntry[] = holdings.map((h) => createHolding(h.stockName, h.currentValue));
@@ -111,6 +121,9 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
                   <Phone className="w-3.5 h-3.5" /> {individual.phone}
                 </span>
               )}
+              <span className="text-xs text-zinc-400 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Updated: {formatDate(individual.updatedAt)}
+              </span>
             </div>
           </div>
         </div>

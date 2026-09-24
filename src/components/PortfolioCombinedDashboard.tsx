@@ -46,6 +46,15 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
       maximumFractionDigits: 0,
     }).format(val);
 
+  const formatDate = (ts: number) =>
+    new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(ts));
+
   const barColors = [
     'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-orange-500',
     'bg-pink-500', 'bg-cyan-500', 'bg-amber-500', 'bg-indigo-500',
@@ -221,13 +230,18 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
                     <tr key={ind.id} className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors">
                       <td className="px-5 py-3 text-xs text-zinc-600 tabular-nums">{idx + 1}</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/20 text-blue-400 font-bold text-[10px] shrink-0">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/20 text-blue-400 font-bold text-xs shrink-0">
                             {ind.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <span className="text-xs font-medium text-zinc-300">{ind.name}</span>
-                            <span className="ml-2 text-[10px] text-zinc-600">({ind.holdings.length} stocks)</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-zinc-300">{ind.name}</span>
+                              <span className="text-[10px] text-zinc-600">({ind.holdings.length} stocks)</span>
+                            </div>
+                            <div className="text-[10px] text-zinc-500 mt-0.5">
+                              Updated {formatDate(ind.updatedAt)}
+                            </div>
                           </div>
                         </div>
                       </td>
