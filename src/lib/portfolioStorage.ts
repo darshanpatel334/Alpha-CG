@@ -39,6 +39,39 @@ export interface AggregatedHolding {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Normalise a stock name to create a strong grouping key.
+ * Removes common suffixes (ltd, limited, eq), spaces, and special characters.
+ */
+export function getStockGroupingKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(ltd\.?|limited|eq|equity)\b/g, '') // remove common suffixes
+    .replace(/&/g, 'and')                           // normalize ampersand
+    .replace(/[^a-z0-9]/g, '');                     // remove spaces and special chars
+}
+
+/**
+ * Combine duplicate holdings using the strong grouping key.
+ */
+export function combineHoldingsList(holdings: HoldingEntry[]): HoldingEntry[] {
+  const map = new Map<string, HoldingEntry>();
+  for (const h of holdings) {
+    const key = getStockGroupingKey(h.stockName);
+    const finalKey = key || h.stockName.toLowerCase().trim();
+    const existing = map.get(finalKey);
+    if (existing) {
+      existing.currentValue += h.currentValue;
+      if (h.stockName.length < existing.stockName.length && h.stockName.length > 3) {
+        existing.stockName = h.stockName.trim();
+      }
+    } else {
+      map.set(finalKey, { ...h, stockName: h.stockName.trim() });
+    }
+  }
+  return Array.from(map.values());
+}
+
 function readStore(): Individual[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -63,7 +96,22 @@ function writeStore(data: Individual[]): void {
 /** Get all individuals from localStorage. */
 export function getIndividuals(): Individual[] {
   try {
-    return readStore();
+    const data = readStore();
+    let migrated = false;
+
+    for (const ind of data) {
+      const combined = combineHoldingsList(ind.holdings);
+      if (combined.length !== ind.holdings.length) {
+        ind.holdings = combined;
+        migrated = true;
+      }
+    }
+
+    if (migrated) {
+      writeStore(data);
+    }
+    
+    return data;
   } catch (err) {
     console.error('[portfolioStorage] getIndividuals failed:', err);
     return [];
@@ -107,7 +155,7 @@ export function addHoldings(individualId: string, holdings: HoldingEntry[]): voi
       console.warn(`[portfolioStorage] Individual ${individualId} not found`);
       return;
     }
-    individual.holdings = [...individual.holdings, ...holdings];
+    individual.holdings = combineHoldingsList([...individual.holdings, ...holdings]);
     individual.updatedAt = Date.now();
     writeStore(data);
   } catch (err) {
@@ -147,6 +195,7 @@ export function updateHolding(individualId: string, holding: HoldingEntry): void
       return;
     }
     individual.holdings[idx] = holding;
+    individual.holdings = combineHoldingsList(individual.holdings);
     individual.updatedAt = Date.now();
     writeStore(data);
   } catch (err) {
@@ -173,17 +222,7 @@ export function clearHoldings(individualId: string): void {
 
 // ── Aggregation ─────────────────────────────────────────────────────────────
 
-/**
- * Normalise a stock name to create a strong grouping key.
- * Removes common suffixes (ltd, limited, eq), spaces, and special characters.
- */
-function getStockGroupingKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\b(ltd\.?|limited|eq|equity)\b/g, '') // remove common suffixes
-    .replace(/&/g, 'and')                           // normalize ampersand
-    .replace(/[^a-z0-9]/g, '');                     // remove spaces and special chars
-}
+// (Moving getStockGroupingKey up)
 
 /**
  * Aggregate holdings across all supplied individuals.
