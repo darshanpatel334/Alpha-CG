@@ -7,12 +7,16 @@ import {
   ImageIcon,
   ClipboardPaste,
   X,
-  Check,
   Table2,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import { parsePortfolioFile, parsePortfolioFromPaste } from '@/lib/portfolioParser';
+import {
+  extractRawFromFile,
+  extractRawFromPaste,
+  type RawPortfolioData,
+} from '@/lib/portfolioParser';
+import { PortfolioColumnReview } from './PortfolioColumnReview';
 
 interface PortfolioUploadZoneProps {
   onHoldingsParsed: (holdings: { stockName: string; currentValue: number }[]) => void;
@@ -20,42 +24,41 @@ interface PortfolioUploadZoneProps {
 }
 
 export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: PortfolioUploadZoneProps) {
-  const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [parsedCount, setParsedCount] = useState<number | null>(null);
+
+  // Review state: raw data waiting for user confirmation
+  const [reviewData, setReviewData] = useState<RawPortfolioData | null>(null);
+  const [reviewSource, setReviewSource] = useState('');
 
   // Paste state
   const [pasteMode, setPasteMode] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [hasContent, setHasContent] = useState(false);
-  const [pasteRowCount, setPasteRowCount] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleFile = useCallback(
-    async (file: File) => {
-      setError(null);
-      setProcessing(true);
-      setFileName(file.name);
-      setParsedCount(null);
+  // ── File handling ──────────────────────────────────────────────────────
 
-      try {
-        const holdings = await parsePortfolioFile(file);
-        if (holdings.length === 0) {
-          setError('No holdings could be parsed from this file. Please check the format.');
-          setProcessing(false);
-          return;
-        }
-        setParsedCount(holdings.length);
-        onHoldingsParsed(holdings);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to parse file');
-      } finally {
+  const handleFile = useCallback(async (file: File) => {
+    setError(null);
+    setProcessing(true);
+    setReviewData(null);
+
+    try {
+      const raw = await extractRawFromFile(file);
+      if (raw.headers.length === 0 || raw.rows.length === 0) {
+        setError('No data could be extracted from this file. Please check the format.');
         setProcessing(false);
+        return;
       }
-    },
-    [onHoldingsParsed]
-  );
+      setReviewData(raw);
+      setReviewSource(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to parse file');
+    } finally {
+      setProcessing(false);
+    }
+  }, []);
 
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: unknown[]) => {
@@ -70,12 +73,6 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
     [handleFile]
   );
 
-  const clearFile = useCallback(() => {
-    setFileName(null);
-    setError(null);
-    setParsedCount(null);
-  }, []);
-
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -86,10 +83,11 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
       'image/png': ['.png'],
     },
     maxFiles: 1,
-    disabled: isProcessing || processing,
+    disabled: isProcessing || processing || reviewData !== null,
   });
 
-  // Paste handlers
+  // ── Paste handling ─────────────────────────────────────────────────────
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       e.preventDefault();
@@ -99,43 +97,88 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
         if (textareaRef.current) {
           textareaRef.current.value = text;
         }
-        const holdings = parsePortfolioFromPaste(text);
-        if (holdings.length > 0) {
-          setPasteRowCount(holdings.length);
-          onHoldingsParsed(holdings);
-        } else {
-          setError('Could not parse holdings from pasted data. Ensure columns include stock name and value.');
+        setError(null);
+        const raw = extractRawFromPaste(text);
+        if (raw.headers.length === 0 || raw.rows.length === 0) {
+          setError('Could not parse data from pasted content. Ensure it has a header row and data rows.');
+          return;
         }
+        setReviewData(raw);
+        setReviewSource('Pasted Data');
+      }
+    },
+    []
+  );
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setHasContent(!!e.target.value.trim());
+  }, []);
+
+  const handleSubmitPaste = useCallback(() => {
+    if (textareaRef.current && textareaRef.current.value.trim()) {
+      setError(null);
+      const raw = extractRawFromPaste(textareaRef.current.value);
+      if (raw.headers.length === 0 || raw.rows.length === 0) {
+        setError('Could not parse data. Ensure it has a header row and data rows.');
+        return;
+      }
+      setReviewData(raw);
+      setReviewSource('Pasted Data');
+    }
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setReviewData(null);
+    setReviewSource('');
+    setError(null);
+    setHasContent(false);
+    if (textareaRef.current) {
+      textareaRef.current.value = '';
+    }
+  }, []);
+
+  // ── Review confirm/cancel ──────────────────────────────────────────────
+
+  const handleReviewConfirm = useCallback(
+    (holdings: { stockName: string; currentValue: number }[]) => {
+      onHoldingsParsed(holdings);
+      setReviewData(null);
+      setReviewSource('');
+      setHasContent(false);
+      if (textareaRef.current) {
+        textareaRef.current.value = '';
       }
     },
     [onHoldingsParsed]
   );
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setHasContent(!!e.target.value.trim());
-    setPasteRowCount(null);
+  const handleReviewCancel = useCallback(() => {
+    setReviewData(null);
+    setReviewSource('');
   }, []);
 
-  const handleSubmitPaste = useCallback(() => {
-    if (textareaRef.current && textareaRef.current.value.trim()) {
-      const holdings = parsePortfolioFromPaste(textareaRef.current.value);
-      if (holdings.length > 0) {
-        setPasteRowCount(holdings.length);
-        onHoldingsParsed(holdings);
-      } else {
-        setError('Could not parse holdings. Ensure columns include stock name and value.');
-      }
-    }
-  }, [onHoldingsParsed]);
+  // ── If in review mode, show the review component ───────────────────────
 
-  const clearPaste = useCallback(() => {
-    if (textareaRef.current) {
-      textareaRef.current.value = '';
-    }
-    setHasContent(false);
-    setPasteRowCount(null);
-    setError(null);
-  }, []);
+  if (reviewData) {
+    return (
+      <div className="space-y-4">
+        <PortfolioColumnReview
+          rawData={reviewData}
+          sourceName={reviewSource}
+          onConfirm={handleReviewConfirm}
+          onCancel={handleReviewCancel}
+        />
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+            <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Normal upload / paste mode ─────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -185,23 +228,7 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
             {processing ? (
               <div className="flex items-center gap-3">
                 <Loader2 className="h-6 w-6 text-blue-400 animate-spin" />
-                <p className="text-sm text-zinc-300">Processing {fileName}...</p>
-              </div>
-            ) : fileName && parsedCount !== null ? (
-              <div className="flex items-center gap-3">
-                <FileSpreadsheet className="h-8 w-8 text-emerald-500" strokeWidth={1.5} />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-zinc-200">{fileName}</p>
-                  <p className="text-xs text-emerald-500 flex items-center gap-1">
-                    <Check className="h-3 w-3" /> {parsedCount} holdings parsed
-                  </p>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); clearFile(); }}
-                  className="ml-2 rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <p className="text-sm text-zinc-300">Processing file...</p>
               </div>
             ) : (
               <>
@@ -245,22 +272,14 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
                 Paste Holdings
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {pasteRowCount !== null && (
-                <span className="text-[10px] font-medium text-emerald-500 flex items-center gap-1">
-                  <Check className="h-3 w-3" />
-                  {pasteRowCount} holdings parsed
-                </span>
-              )}
-              {hasContent && (
-                <button
-                  onClick={clearPaste}
-                  className="rounded p-1 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-400 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+            {hasContent && (
+              <button
+                onClick={clearAll}
+                className="rounded p-1 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-400 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <textarea
@@ -280,14 +299,14 @@ HDFC Bank\t150000`}
             className="w-full min-h-[140px] resize-y bg-transparent px-4 py-3 text-xs text-zinc-300 placeholder:text-zinc-600 font-mono leading-relaxed outline-none"
           />
 
-          {hasContent && pasteRowCount === null && (
+          {hasContent && (
             <div className="border-t border-zinc-800/50 px-4 py-2 flex justify-end">
               <button
                 onClick={handleSubmitPaste}
                 className="inline-flex items-center gap-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 text-[11px] font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
               >
                 <Table2 className="h-3 w-3" />
-                Parse Holdings
+                Review Data
               </button>
             </div>
           )}
