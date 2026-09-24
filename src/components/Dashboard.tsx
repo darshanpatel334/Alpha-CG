@@ -11,7 +11,7 @@ import { type BankingProcessingResult } from '@/lib/bankingEngine';
 type Tab = 'capitalGains' | 'bankStatement' | 'tis' | 'allDetails' | 'portfolios';
 
 export function Dashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>('capitalGains');
+  const [activeTab, setActiveTab] = useState<Tab>('portfolios');
   const [cgResult, setCgResult] = useState<ProcessingResult | null>(null);
   const [bsResult, setBsResult] = useState<BankingProcessingResult | null>(null);
 
@@ -26,7 +26,7 @@ export function Dashboard() {
             </div>
             <div>
               <h1 className="text-sm font-bold text-zinc-100 tracking-tight">
-                Nivezo Tax
+                LifeNivesh Fund Management
               </h1>
               <p className="text-[10px] text-zinc-600 uppercase tracking-widest">
                 Financial Analysis Engine
@@ -36,6 +36,17 @@ export function Dashboard() {
 
           {/* Global Tabs */}
           <div className="flex bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
+            <button
+              onClick={() => setActiveTab('portfolios')}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
+                activeTab === 'portfolios'
+                  ? 'bg-zinc-800 text-zinc-200 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+            >
+              <Briefcase className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Portfolios
+            </button>
             <button
               onClick={() => setActiveTab('capitalGains')}
               className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
@@ -79,17 +90,6 @@ export function Dashboard() {
             >
               <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
               ALL Details
-            </button>
-            <button
-              onClick={() => setActiveTab('portfolios')}
-              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
-                activeTab === 'portfolios'
-                  ? 'bg-zinc-800 text-zinc-200 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-400'
-              }`}
-            >
-              <Briefcase className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Portfolios
             </button>
           </div>
         </div>
