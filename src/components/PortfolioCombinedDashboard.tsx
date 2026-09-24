@@ -12,7 +12,10 @@ import {
   Pencil,
   Trash2,
   Check,
-  Plus
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown
 } from 'lucide-react';
 
 interface PortfolioCombinedDashboardProps {
@@ -32,12 +35,48 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
   const [addName, setAddName] = useState('');
   const [addValue, setAddValue] = useState('');
 
+  type SortKey = 'stockName' | 'entries' | 'totalValue';
+  const [sortKey, setSortKey] = useState<SortKey>('totalValue');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   const aggregated = getAggregatedHoldings(individuals);
   const grandTotal = aggregated.reduce((sum, h) => sum + h.totalValue, 0);
   const totalStocks = aggregated.length;
   const totalIndividuals = individuals.filter((i) => i.holdings.length > 0).length;
 
   const selectedAggregated = selectedGroupKey ? aggregated.find(a => a.groupKey === selectedGroupKey) : null;
+
+  const sortedAggregated = [...aggregated].sort((a, b) => {
+    let valA, valB;
+    if (sortKey === 'stockName') {
+      valA = a.stockName.toLowerCase();
+      valB = b.stockName.toLowerCase();
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    } else if (sortKey === 'entries') {
+      valA = a.breakdown.length;
+      valB = b.breakdown.length;
+    } else {
+      valA = a.totalValue;
+      valB = b.totalValue;
+    }
+    return sortDir === 'asc' ? valA - valB : valB - valA;
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40 group-hover:opacity-100" />;
+    return sortDir === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-blue-400" /> : <ChevronDown className="w-3 h-3 ml-1 text-blue-400" />;
+  };
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-IN', {
@@ -296,15 +335,35 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh }: Portfolio
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800/40">
                 <th className="text-left px-5 py-2.5 font-medium">#</th>
-                <th className="text-left px-5 py-2.5 font-medium">Stock Name</th>
-                <th className="text-center px-5 py-2.5 font-medium">Entries</th>
-                <th className="text-right px-5 py-2.5 font-medium">Total Value</th>
-                <th className="text-right px-5 py-2.5 font-medium">% of Total</th>
+                <th 
+                  className="text-left px-5 py-2.5 font-medium cursor-pointer group hover:text-zinc-300"
+                  onClick={() => handleSort('stockName')}
+                >
+                  <div className="flex items-center">Stock Name <SortIcon columnKey="stockName" /></div>
+                </th>
+                <th 
+                  className="text-center px-5 py-2.5 font-medium cursor-pointer group hover:text-zinc-300"
+                  onClick={() => handleSort('entries')}
+                >
+                  <div className="flex items-center justify-center">Entries <SortIcon columnKey="entries" /></div>
+                </th>
+                <th 
+                  className="text-right px-5 py-2.5 font-medium cursor-pointer group hover:text-zinc-300"
+                  onClick={() => handleSort('totalValue')}
+                >
+                  <div className="flex items-center justify-end">Total Value <SortIcon columnKey="totalValue" /></div>
+                </th>
+                <th 
+                  className="text-right px-5 py-2.5 font-medium cursor-pointer group hover:text-zinc-300"
+                  onClick={() => handleSort('totalValue')}
+                >
+                  <div className="flex items-center justify-end">% of Total <SortIcon columnKey="totalValue" /></div>
+                </th>
                 <th className="text-center px-5 py-2.5 font-medium w-24">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {aggregated.map((stock, idx) => (
+              {sortedAggregated.map((stock, idx) => (
                 <tr
                   key={stock.groupKey}
                   className="border-b border-zinc-800/20 hover:bg-zinc-800/20 transition-colors"
