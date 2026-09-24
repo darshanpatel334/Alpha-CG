@@ -3,11 +3,12 @@ import { CapitalGainsDashboard } from './CapitalGainsDashboard';
 import { BankStatementDashboard } from './BankStatementDashboard';
 import { TISDashboard } from './TISDashboard';
 import { AllDetailsDashboard } from './AllDetailsDashboard';
-import { BarChart3, Landmark, Activity, ShieldCheck } from 'lucide-react';
+import { PortfolioDashboard } from './PortfolioDashboard';
+import { BarChart3, Landmark, Activity, ShieldCheck, Briefcase } from 'lucide-react';
 import { type ProcessingResult } from '@/lib/taxEngine';
 import { type BankingProcessingResult } from '@/lib/bankingEngine';
 
-type Tab = 'capitalGains' | 'bankStatement' | 'tis' | 'allDetails';
+type Tab = 'capitalGains' | 'bankStatement' | 'tis' | 'allDetails' | 'portfolios';
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('capitalGains');
@@ -79,6 +80,17 @@ export function Dashboard() {
               <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
               ALL Details
             </button>
+            <button
+              onClick={() => setActiveTab('portfolios')}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all duration-200 ${
+                activeTab === 'portfolios'
+                  ? 'bg-zinc-800 text-zinc-200 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-400'
+              }`}
+            >
+              <Briefcase className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Portfolios
+            </button>
           </div>
         </div>
       </header>
@@ -101,6 +113,10 @@ export function Dashboard() {
 
       <div className={activeTab === 'allDetails' ? 'block' : 'hidden'}>
         <AllDetailsDashboard cgResult={cgResult} bsResult={bsResult} />
+      </div>
+
+      <div className={activeTab === 'portfolios' ? 'block' : 'hidden'}>
+        <PortfolioDashboard />
       </div>
     </div>
   );

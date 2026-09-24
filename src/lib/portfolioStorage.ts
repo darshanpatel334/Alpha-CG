@@ -1,0 +1,231 @@
+// ---------------------------------------------------------------------------
+// portfolioStorage.ts – localStorage-backed CRUD for individuals & holdings
+// Storage key: 'nivezotax_portfolios'
+// ---------------------------------------------------------------------------
+
+const STORAGE_KEY = 'nivezotax_portfolios';
+
+// ── Interfaces ──────────────────────────────────────────────────────────────
+
+export interface HoldingEntry {
+  id: string;
+  stockName: string;
+  currentValue: number; // in INR
+}
+
+export interface Individual {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  holdings: HoldingEntry[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AggregatedHolding {
+  stockName: string;
+  totalValue: number;
+  percentOfTotal: number;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function readStore(): Individual[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Individual[];
+  } catch (err) {
+    console.error('[portfolioStorage] Failed to read store:', err);
+    return [];
+  }
+}
+
+function writeStore(data: Individual[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('[portfolioStorage] Failed to write store:', err);
+  }
+}
+
+// ── Individual CRUD ─────────────────────────────────────────────────────────
+
+/** Get all individuals from localStorage. */
+export function getIndividuals(): Individual[] {
+  try {
+    return readStore();
+  } catch (err) {
+    console.error('[portfolioStorage] getIndividuals failed:', err);
+    return [];
+  }
+}
+
+/** Upsert an individual – adds if new, replaces if same id exists. */
+export function saveIndividual(individual: Individual): void {
+  try {
+    const data = readStore();
+    const idx = data.findIndex((i) => i.id === individual.id);
+    if (idx !== -1) {
+      data[idx] = { ...individual, updatedAt: Date.now() };
+    } else {
+      data.push(individual);
+    }
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] saveIndividual failed:', err);
+  }
+}
+
+/** Delete an individual by id. */
+export function deleteIndividual(id: string): void {
+  try {
+    const data = readStore().filter((i) => i.id !== id);
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] deleteIndividual failed:', err);
+  }
+}
+
+// ── Holding CRUD ────────────────────────────────────────────────────────────
+
+/** Append holdings to an individual's holdings array. */
+export function addHoldings(individualId: string, holdings: HoldingEntry[]): void {
+  try {
+    const data = readStore();
+    const individual = data.find((i) => i.id === individualId);
+    if (!individual) {
+      console.warn(`[portfolioStorage] Individual ${individualId} not found`);
+      return;
+    }
+    individual.holdings = [...individual.holdings, ...holdings];
+    individual.updatedAt = Date.now();
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] addHoldings failed:', err);
+  }
+}
+
+/** Remove a single holding by holdingId from an individual. */
+export function removeHolding(individualId: string, holdingId: string): void {
+  try {
+    const data = readStore();
+    const individual = data.find((i) => i.id === individualId);
+    if (!individual) {
+      console.warn(`[portfolioStorage] Individual ${individualId} not found`);
+      return;
+    }
+    individual.holdings = individual.holdings.filter((h) => h.id !== holdingId);
+    individual.updatedAt = Date.now();
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] removeHolding failed:', err);
+  }
+}
+
+/** Update a single holding entry (matched by holding.id). */
+export function updateHolding(individualId: string, holding: HoldingEntry): void {
+  try {
+    const data = readStore();
+    const individual = data.find((i) => i.id === individualId);
+    if (!individual) {
+      console.warn(`[portfolioStorage] Individual ${individualId} not found`);
+      return;
+    }
+    const idx = individual.holdings.findIndex((h) => h.id === holding.id);
+    if (idx === -1) {
+      console.warn(`[portfolioStorage] Holding ${holding.id} not found`);
+      return;
+    }
+    individual.holdings[idx] = holding;
+    individual.updatedAt = Date.now();
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] updateHolding failed:', err);
+  }
+}
+
+/** Clear all holdings for an individual. */
+export function clearHoldings(individualId: string): void {
+  try {
+    const data = readStore();
+    const individual = data.find((i) => i.id === individualId);
+    if (!individual) {
+      console.warn(`[portfolioStorage] Individual ${individualId} not found`);
+      return;
+    }
+    individual.holdings = [];
+    individual.updatedAt = Date.now();
+    writeStore(data);
+  } catch (err) {
+    console.error('[portfolioStorage] clearHoldings failed:', err);
+  }
+}
+
+// ── Aggregation ─────────────────────────────────────────────────────────────
+
+/**
+ * Aggregate holdings across all supplied individuals.
+ * Stocks are combined by name (case-insensitive).
+ * Results are sorted by totalValue descending.
+ */
+export function getAggregatedHoldings(individuals: Individual[]): AggregatedHolding[] {
+  try {
+    const map = new Map<string, { displayName: string; totalValue: number }>();
+
+    for (const individual of individuals) {
+      for (const h of individual.holdings) {
+        const key = h.stockName.trim().toLowerCase();
+        const existing = map.get(key);
+        if (existing) {
+          existing.totalValue += h.currentValue;
+        } else {
+          map.set(key, { displayName: h.stockName.trim(), totalValue: h.currentValue });
+        }
+      }
+    }
+
+    const grandTotal = Array.from(map.values()).reduce((sum, v) => sum + v.totalValue, 0);
+
+    return Array.from(map.values())
+      .map(({ displayName, totalValue }) => ({
+        stockName: displayName,
+        totalValue,
+        percentOfTotal: grandTotal > 0 ? (totalValue / grandTotal) * 100 : 0,
+      }))
+      .sort((a, b) => b.totalValue - a.totalValue);
+  } catch (err) {
+    console.error('[portfolioStorage] getAggregatedHoldings failed:', err);
+    return [];
+  }
+}
+
+// ── Factory helpers ─────────────────────────────────────────────────────────
+
+/** Create a new Individual object with a generated id and timestamps. */
+export function createIndividual(
+  name: string,
+  email?: string,
+  phone?: string,
+): Individual {
+  const now = Date.now();
+  return {
+    id: crypto.randomUUID(),
+    name,
+    email,
+    phone,
+    holdings: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/** Create a new HoldingEntry with a generated id. */
+export function createHolding(stockName: string, currentValue: number): HoldingEntry {
+  return {
+    id: crypto.randomUUID(),
+    stockName,
+    currentValue,
+  };
+}
