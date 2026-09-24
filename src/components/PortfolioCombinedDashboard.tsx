@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ArrowUpDown,
   SplitSquareHorizontal,
-  Merge
+  Merge,
+  Search
 } from 'lucide-react';
 
 interface PortfolioCombinedDashboardProps {
@@ -168,6 +169,7 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
 
   const [showMerge, setShowMerge] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
+  const [mergeSearch, setMergeSearch] = useState('');
 
   const handleMergeGroup = () => {
     if (mergeTarget && selectedAggregated) {
@@ -611,26 +613,55 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
                 ) : (
                   <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4 animate-in fade-in slide-in-from-top-2">
                     <h4 className="text-xs font-semibold text-zinc-300 mb-3">Merge Group Into...</h4>
-                    <div className="flex gap-3">
-                      <select
-                        value={mergeTarget}
-                        onChange={(e) => setMergeTarget(e.target.value)}
-                        className="flex-1 rounded-md bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-purple-500"
-                      >
-                        <option value="">Select target group...</option>
+                    <div className="flex flex-col gap-3">
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-2.5 top-2 text-zinc-500" />
+                        <input
+                          type="text"
+                          placeholder="Search and select target group..."
+                          value={mergeSearch}
+                          onChange={(e) => {
+                            setMergeSearch(e.target.value);
+                            setMergeTarget(''); // clear selection when typing
+                          }}
+                          className="w-full rounded-md bg-zinc-800 border border-zinc-700 pl-9 pr-3 py-2 text-xs text-zinc-200 outline-none focus:border-purple-500 transition-colors"
+                        />
+                      </div>
+                      <div className="max-h-40 overflow-y-auto border border-zinc-800/80 rounded-md bg-zinc-900/50 flex flex-col custom-scrollbar">
                         {aggregated
                           .filter(a => a.groupKey !== selectedAggregated.groupKey)
+                          .filter(a => a.stockName.toLowerCase().includes(mergeSearch.toLowerCase()))
                           .sort((a, b) => a.stockName.localeCompare(b.stockName))
                           .map(a => (
-                            <option key={a.groupKey} value={a.stockName}>{a.stockName} ({a.breakdown.length} entries)</option>
-                          ))}
-                      </select>
-                      <button onClick={handleMergeGroup} disabled={!mergeTarget} className="px-3 rounded-md bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 flex items-center justify-center border border-purple-500/20 disabled:opacity-50">
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setShowMerge(false)} className="px-3 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 border border-transparent">
-                        <X className="w-4 h-4" />
-                      </button>
+                            <button
+                              key={a.groupKey}
+                              onClick={() => {
+                                setMergeTarget(a.stockName);
+                                setMergeSearch(a.stockName);
+                              }}
+                              className={`text-left px-3 py-2 text-xs transition-colors border-b border-zinc-800/40 last:border-0 ${
+                                mergeTarget === a.stockName ? 'bg-purple-500/20 text-purple-300 font-medium' : 'text-zinc-300 hover:bg-zinc-800/80'
+                              }`}
+                            >
+                              {a.stockName} <span className="text-zinc-500">({a.breakdown.length} entries)</span>
+                            </button>
+                          ))
+                        }
+                        {aggregated.filter(a => a.groupKey !== selectedAggregated.groupKey && a.stockName.toLowerCase().includes(mergeSearch.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-4 text-center text-xs text-zinc-500">
+                            No matching groups found.
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex justify-end gap-2 mt-1">
+                        <button onClick={() => setShowMerge(false)} className="px-3 py-1.5 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 border border-transparent text-xs transition-colors">
+                          Cancel
+                        </button>
+                        <button onClick={handleMergeGroup} disabled={!mergeTarget} className="px-4 py-1.5 rounded-md bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 flex items-center justify-center border border-purple-500/20 disabled:opacity-50 text-xs font-medium gap-1.5 transition-colors">
+                          <Check className="w-3.5 h-3.5" /> Confirm Merge
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
