@@ -15,11 +15,12 @@ import {
   extractRawFromFile,
   extractRawFromPaste,
   type RawPortfolioData,
+  type PortfolioHolding,
 } from '@/lib/portfolioParser';
 import { PortfolioColumnReview } from './PortfolioColumnReview';
 
 interface PortfolioUploadZoneProps {
-  onHoldingsParsed: (holdings: { stockName: string; currentValue: number }[]) => void;
+  onHoldingsParsed: (holdings: PortfolioHolding[]) => void;
   isProcessing: boolean;
 }
 
@@ -140,7 +141,7 @@ export function PortfolioUploadZone({ onHoldingsParsed, isProcessing }: Portfoli
   // ── Review confirm/cancel ──────────────────────────────────────────────
 
   const handleReviewConfirm = useCallback(
-    (holdings: { stockName: string; currentValue: number }[]) => {
+    (holdings: PortfolioHolding[]) => {
       onHoldingsParsed(holdings);
       setReviewData(null);
       setReviewSource('');

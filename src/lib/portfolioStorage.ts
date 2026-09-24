@@ -11,6 +11,7 @@ export interface HoldingEntry {
   id: string;
   stockName: string;
   currentValue: number; // in INR
+  quantity?: number;
 }
 
 export interface Individual {
@@ -33,6 +34,7 @@ export interface AggregatedHolding {
   groupKey: string;
   stockName: string;
   totalValue: number;
+  totalQuantity?: number;
   percentOfTotal: number;
   breakdown: AggregatedHoldingBreakdown[];
 }
@@ -80,6 +82,9 @@ export function combineHoldingsList(holdings: HoldingEntry[]): HoldingEntry[] {
     const existing = result.find(r => areStocksSame(r.stockName, h.stockName));
     if (existing) {
       existing.currentValue += h.currentValue;
+      if (h.quantity !== undefined) {
+        existing.quantity = (existing.quantity || 0) + h.quantity;
+      }
       if (h.stockName.length < existing.stockName.length && h.stockName.length > 3) {
         existing.stockName = h.stockName.trim();
       }
@@ -248,6 +253,7 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
       groupKey: string;
       displayName: string;
       totalValue: number;
+      totalQuantity?: number;
       breakdown: AggregatedHoldingBreakdown[];
     }[] = [];
 
@@ -257,6 +263,9 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
         
         if (existing) {
           existing.totalValue += h.currentValue;
+          if (h.quantity !== undefined) {
+            existing.totalQuantity = (existing.totalQuantity || 0) + h.quantity;
+          }
           existing.breakdown.push({
             individualId: individual.id,
             individualName: individual.name,
@@ -272,6 +281,7 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
             groupKey: newKey,
             displayName: h.stockName.trim(),
             totalValue: h.currentValue,
+            totalQuantity: h.quantity,
             breakdown: [{
               individualId: individual.id,
               individualName: individual.name,
@@ -289,6 +299,7 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
         groupKey: a.groupKey,
         stockName: a.displayName,
         totalValue: a.totalValue,
+        totalQuantity: a.totalQuantity,
         percentOfTotal: grandTotal > 0 ? (a.totalValue / grandTotal) * 100 : 0,
         breakdown: a.breakdown.sort((x, y) => y.holding.currentValue - x.holding.currentValue),
       }))
@@ -320,10 +331,11 @@ export function createIndividual(
 }
 
 /** Create a new HoldingEntry with a generated id. */
-export function createHolding(stockName: string, currentValue: number): HoldingEntry {
+export function createHolding(stockName: string, currentValue: number, quantity?: number): HoldingEntry {
   return {
     id: crypto.randomUUID(),
     stockName,
     currentValue,
+    quantity,
   };
 }

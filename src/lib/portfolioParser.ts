@@ -10,6 +10,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 export interface PortfolioHolding {
   stockName: string;
   currentValue: number;
+  quantity?: number;
 }
 
 /** Raw extraction result returned before user review. */
@@ -18,6 +19,7 @@ export interface RawPortfolioData {
   rows: string[][];
   detectedNameCol: number;   // -1 if not auto-detected
   detectedValueCol: number;  // -1 if not auto-detected
+  detectedQtyCol: number;    // -1 if not auto-detected
 }
 
 // ---------------------------------------------------------------------------
@@ -39,24 +41,32 @@ const VALUE_PATTERNS = [
   'closing value',
 ];
 
+const QTY_PATTERNS = [
+  'qty',
+  'quantity',
+  'units',
+  'no. of stocks',
+  'no of stocks',
+  'no. of shares',
+  'no of shares',
+  'no. of holdings',
+  'no of holdings',
+];
+
 /**
  * Given an array of header strings, return the indices of the stock-name
  * column and value column, or `null` when either cannot be identified.
  */
 export function detectColumns(
   headers: string[]
-): { nameIdx: number; valueIdx: number } | null {
+): { nameIdx: number; valueIdx: number; qtyIdx: number } | null {
   let nameIdx = -1;
   let valueIdx = -1;
+  let qtyIdx = -1;
 
-  // Sort patterns by length descending so longer (more specific) patterns
-  // are matched first.
-  const sortedStockPatterns = [...STOCK_NAME_PATTERNS].sort(
-    (a, b) => b.length - a.length
-  );
-  const sortedValuePatterns = [...VALUE_PATTERNS].sort(
-    (a, b) => b.length - a.length
-  );
+  const sortedStockPatterns = [...STOCK_NAME_PATTERNS].sort((a, b) => b.length - a.length);
+  const sortedValuePatterns = [...VALUE_PATTERNS].sort((a, b) => b.length - a.length);
+  const sortedQtyPatterns = [...QTY_PATTERNS].sort((a, b) => b.length - a.length);
 
   for (let i = 0; i < headers.length; i++) {
     const h = (headers[i] ?? '').toLowerCase().trim();
@@ -68,10 +78,13 @@ export function detectColumns(
     if (valueIdx === -1 && sortedValuePatterns.some((p) => h === p || h.includes(p))) {
       valueIdx = i;
     }
+    if (qtyIdx === -1 && sortedQtyPatterns.some((p) => h === p || h.includes(p))) {
+      qtyIdx = i;
+    }
   }
 
   if (nameIdx === -1 || valueIdx === -1) return null;
-  return { nameIdx, valueIdx };
+  return { nameIdx, valueIdx, qtyIdx };
 }
 
 /**
@@ -144,6 +157,7 @@ export async function extractRawFromExcel(file: File): Promise<RawPortfolioData>
             rows: dataRows,
             detectedNameCol: cols?.nameIdx ?? -1,
             detectedValueCol: cols?.valueIdx ?? -1,
+            detectedQtyCol: cols?.qtyIdx ?? -1,
           };
         }
       }
@@ -160,14 +174,15 @@ export async function extractRawFromExcel(file: File): Promise<RawPortfolioData>
           rows: dataRows,
           detectedNameCol: cols?.nameIdx ?? -1,
           detectedValueCol: cols?.valueIdx ?? -1,
+          detectedQtyCol: cols?.qtyIdx ?? -1,
         };
       }
     }
 
-    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
   } catch (err) {
     console.error('[portfolioParser] extractRawFromExcel failed:', err);
-    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
   }
 }
 
@@ -177,7 +192,7 @@ export async function extractRawFromExcel(file: File): Promise<RawPortfolioData>
 export function extractRawFromPaste(text: string): RawPortfolioData {
   try {
     if (!text || !text.trim()) {
-      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
     }
 
     const lines = text
@@ -186,7 +201,7 @@ export function extractRawFromPaste(text: string): RawPortfolioData {
       .filter((l) => l.length > 0);
 
     if (lines.length < 2) {
-      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
     }
 
     const delimiter = lines[0].includes('\t') ? '\t' : ',';
@@ -203,10 +218,11 @@ export function extractRawFromPaste(text: string): RawPortfolioData {
       rows: dataRows,
       detectedNameCol: cols?.nameIdx ?? -1,
       detectedValueCol: cols?.valueIdx ?? -1,
+      detectedQtyCol: cols?.qtyIdx ?? -1,
     };
   } catch (err) {
     console.error('[portfolioParser] extractRawFromPaste failed:', err);
-    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
   }
 }
 
@@ -256,6 +272,7 @@ export async function extractRawFromPDF(file: File): Promise<RawPortfolioData> {
           rows: dataRows,
           detectedNameCol: cols.nameIdx,
           detectedValueCol: cols.valueIdx,
+          detectedQtyCol: cols.qtyIdx,
         };
       }
     }
@@ -268,13 +285,14 @@ export async function extractRawFromPDF(file: File): Promise<RawPortfolioData> {
         rows: allLines.slice(1),
         detectedNameCol: cols?.nameIdx ?? -1,
         detectedValueCol: cols?.valueIdx ?? -1,
+        detectedQtyCol: cols?.qtyIdx ?? -1,
       };
     }
 
-    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
   } catch (err) {
     console.error('[portfolioParser] extractRawFromPDF failed:', err);
-    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+    return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
   }
 }
 
@@ -294,7 +312,7 @@ export async function extractRawFromFile(file: File): Promise<RawPortfolioData> 
     case 'jpeg':
     case 'png':
       console.warn('[portfolioParser] Image/OCR parsing is not yet implemented.');
-      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1 };
+      return { headers: [], rows: [], detectedNameCol: -1, detectedValueCol: -1, detectedQtyCol: -1 };
     default:
       throw new Error(
         `Unsupported file type ".${ext}". Supported formats: .xlsx, .xls, .pdf, .jpg, .jpeg, .png`
@@ -313,17 +331,28 @@ export async function extractRawFromFile(file: File): Promise<RawPortfolioData> 
 export function finaliseHoldings(
   rows: string[][],
   nameColIdx: number,
-  valueColIdx: number
+  valueColIdx: number,
+  qtyColIdx: number = -1
 ): PortfolioHolding[] {
   const holdings: PortfolioHolding[] = [];
   for (const row of rows) {
     const rawName = (row[nameColIdx] ?? '').trim();
     const rawValue = parseNumericValue(row[valueColIdx]);
+    
     if (rawName && !isNaN(rawValue) && rawValue !== 0) {
-      holdings.push({
+      const holding: PortfolioHolding = {
         stockName: normaliseStockName(rawName),
         currentValue: rawValue,
-      });
+      };
+
+      if (qtyColIdx >= 0) {
+        const rawQty = parseNumericValue(row[qtyColIdx]);
+        if (!isNaN(rawQty) && rawQty > 0) {
+          holding.quantity = rawQty;
+        }
+      }
+
+      holdings.push(holding);
     }
   }
   return holdings;
@@ -338,13 +367,13 @@ export async function parsePortfolioFromExcel(
 ): Promise<PortfolioHolding[]> {
   const raw = await extractRawFromExcel(file);
   if (raw.detectedNameCol === -1 || raw.detectedValueCol === -1) return [];
-  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol);
+  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol, raw.detectedQtyCol);
 }
 
 export function parsePortfolioFromPaste(text: string): PortfolioHolding[] {
   const raw = extractRawFromPaste(text);
   if (raw.detectedNameCol === -1 || raw.detectedValueCol === -1) return [];
-  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol);
+  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol, raw.detectedQtyCol);
 }
 
 export async function parsePortfolioFile(
@@ -352,6 +381,6 @@ export async function parsePortfolioFile(
 ): Promise<PortfolioHolding[]> {
   const raw = await extractRawFromFile(file);
   if (raw.detectedNameCol === -1 || raw.detectedValueCol === -1) return [];
-  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol);
+  return finaliseHoldings(raw.rows, raw.detectedNameCol, raw.detectedValueCol, raw.detectedQtyCol);
 }
 

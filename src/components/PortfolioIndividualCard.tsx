@@ -84,8 +84,8 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
       minute: '2-digit',
     }).format(new Date(ts));
 
-  const handleHoldingsParsed = (holdings: { stockName: string; currentValue: number }[]) => {
-    const newHoldings: HoldingEntry[] = holdings.map((h) => createHolding(h.stockName, h.currentValue));
+  const handleHoldingsParsed = (holdings: import('@/lib/portfolioParser').PortfolioHolding[]) => {
+    const newHoldings: HoldingEntry[] = holdings.map((h) => createHolding(h.stockName, h.currentValue, h.quantity));
     addHoldings(individual.id, newHoldings);
     setShowUpload(false);
     onRefresh();
@@ -304,7 +304,14 @@ export function PortfolioIndividualCard({ individual, onDelete, onRefresh }: Por
                         ) : (
                           <div className="flex items-center gap-2.5">
                             <Briefcase className="h-3.5 w-3.5 text-zinc-600" />
-                            <span className="text-sm font-medium text-zinc-300">{holding.stockName}</span>
+                            <span className="text-sm font-medium text-zinc-300">
+                              {holding.stockName}
+                              {holding.quantity ? (
+                                <span className="ml-2 text-[10px] text-zinc-500 font-normal bg-zinc-800/50 px-1.5 py-0.5 rounded">
+                                  {holding.quantity} Stocks
+                                </span>
+                              ) : null}
+                            </span>
                           </div>
                         )}
                       </td>

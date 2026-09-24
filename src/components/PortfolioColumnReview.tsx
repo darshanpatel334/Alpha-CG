@@ -11,12 +11,13 @@ import {
   type RawPortfolioData,
   finaliseHoldings,
   parseNumericValue,
+  type PortfolioHolding,
 } from '@/lib/portfolioParser';
 
 interface PortfolioColumnReviewProps {
   rawData: RawPortfolioData;
   sourceName: string;  // file name or "Pasted Data"
-  onConfirm: (holdings: { stockName: string; currentValue: number }[]) => void;
+  onConfirm: (holdings: PortfolioHolding[]) => void;
   onCancel: () => void;
 }
 
@@ -28,6 +29,7 @@ export function PortfolioColumnReview({
 }: PortfolioColumnReviewProps) {
   const [nameCol, setNameCol] = useState(rawData.detectedNameCol);
   const [valueCol, setValueCol] = useState(rawData.detectedValueCol);
+  const [qtyCol, setQtyCol] = useState(rawData.detectedQtyCol);
 
   // Preview rows (show up to 8)
   const previewRows = rawData.rows.slice(0, 8);
@@ -36,12 +38,12 @@ export function PortfolioColumnReview({
   // Compute how many valid holdings we'd get with the current selection
   const validCount = useMemo(() => {
     if (nameCol === -1 || valueCol === -1) return 0;
-    return finaliseHoldings(rawData.rows, nameCol, valueCol).length;
-  }, [rawData.rows, nameCol, valueCol]);
+    return finaliseHoldings(rawData.rows, nameCol, valueCol, qtyCol).length;
+  }, [rawData.rows, nameCol, valueCol, qtyCol]);
 
   const handleConfirm = () => {
     if (nameCol === -1 || valueCol === -1) return;
-    const holdings = finaliseHoldings(rawData.rows, nameCol, valueCol);
+    const holdings = finaliseHoldings(rawData.rows, nameCol, valueCol, qtyCol);
     onConfirm(holdings);
   };
 
@@ -78,9 +80,9 @@ export function PortfolioColumnReview({
       {/* Column Selection */}
       <div className="px-5 py-4 border-b border-zinc-800/40 bg-zinc-900/30">
         <p className="text-xs text-zinc-400 mb-3">
-          Select which columns contain the <strong className="text-zinc-300">Stock Name</strong> and <strong className="text-zinc-300">Current Value</strong>:
+          Select which columns contain the <strong className="text-zinc-300">Stock Name</strong>, <strong className="text-zinc-300">Current Value</strong>, and optionally <strong className="text-zinc-300">Quantity</strong>:
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Stock Name Column Selector */}
           <div>
             <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1.5">
@@ -133,6 +135,34 @@ export function PortfolioColumnReview({
             {valueCol !== -1 && (
               <p className="mt-1 text-[10px] text-zinc-500">
                 Selected: <span className="text-zinc-300 font-medium">{rawData.headers[valueCol] || `Column ${valueCol + 1}`}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Qty Column Selector (Optional) */}
+          <div>
+            <label className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium block mb-1.5">
+              Quantity Column <span className="text-zinc-600">(Optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                value={qtyCol}
+                onChange={(e) => setQtyCol(Number(e.target.value))}
+                className="w-full appearance-none rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-3 py-2.5 pr-8 text-xs text-zinc-200 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all cursor-pointer"
+              >
+                <option value={-1} className="bg-zinc-800 text-zinc-400">— None —</option>
+                {rawData.headers.map((header, idx) => (
+                  <option key={idx} value={idx} className="bg-zinc-800">
+                    {header || `Column ${idx + 1}`}
+                    {idx === rawData.detectedQtyCol ? ' (auto-detected)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500 pointer-events-none" />
+            </div>
+            {qtyCol !== -1 && (
+              <p className="mt-1 text-[10px] text-zinc-500">
+                Selected: <span className="text-zinc-300 font-medium">{rawData.headers[qtyCol] || `Column ${qtyCol + 1}`}</span>
               </p>
             )}
           </div>

@@ -18,7 +18,8 @@ import {
   ArrowUpDown,
   SplitSquareHorizontal,
   Merge,
-  Search
+  Search,
+  Download
 } from 'lucide-react';
 
 interface PortfolioCombinedDashboardProps {
@@ -180,6 +181,26 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
       closeModal();
       if (onRefresh) onRefresh();
     }
+  };
+
+  const handleDownloadCSV = () => {
+    const headers = ['Stock Name', 'Entries', 'Total Quantity', 'Total Value (INR)', '% of Total'];
+    const rows = sortedAggregated.map(a => [
+      `"${a.stockName.replace(/"/g, '""')}"`,
+      a.breakdown.length,
+      a.totalQuantity ?? '',
+      a.totalValue.toFixed(2),
+      a.percentOfTotal.toFixed(2)
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Combined_Holdings_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (aggregated.length === 0) {
@@ -358,7 +379,15 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
           <div className="flex items-center gap-2">
             <PieChart className="w-4 h-4 text-zinc-400" />
             <h4 className="text-sm font-semibold text-zinc-200">Combined Holdings</h4>
-            <span className="text-[10px] text-zinc-600 ml-auto">{aggregated.length} stocks across {totalIndividuals} individuals</span>
+            <div className="ml-auto flex items-center gap-3">
+              <span className="text-[10px] text-zinc-600 hidden sm:inline-block">{aggregated.length} stocks across {totalIndividuals} individuals</span>
+              <button
+                onClick={handleDownloadCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md hover:bg-blue-500/20 transition-colors text-xs font-medium"
+              >
+                <Download className="w-3.5 h-3.5" /> Export CSV
+              </button>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -401,7 +430,14 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
                 >
                   <td className="px-5 py-3 text-xs text-zinc-600 tabular-nums">{idx + 1}</td>
                   <td className="px-5 py-3">
-                    <span className="text-xs font-medium text-zinc-300">{stock.stockName}</span>
+                    <span className="text-xs font-medium text-zinc-300">
+                      {stock.stockName}
+                      {stock.totalQuantity ? (
+                        <span className="ml-2 text-[10px] text-zinc-500 font-normal bg-zinc-800/50 px-1.5 py-0.5 rounded inline-block">
+                          {stock.totalQuantity} Stocks
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className="px-5 py-3 text-center">
                     <span className="text-xs text-zinc-500 tabular-nums">{stock.breakdown.length}</span>
@@ -502,7 +538,14 @@ export function PortfolioCombinedDashboard({ individuals, onRefresh, onNavigateT
                               className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500"
                             />
                           ) : (
-                            <span className="text-xs text-zinc-400">{b.holding.stockName}</span>
+                            <span className="text-xs text-zinc-400">
+                              {b.holding.stockName}
+                              {b.holding.quantity ? (
+                                <span className="ml-1 text-[10px] text-zinc-500">
+                                  ({b.holding.quantity} Stocks)
+                                </span>
+                              ) : null}
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-right">
