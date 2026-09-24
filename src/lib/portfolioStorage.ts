@@ -166,8 +166,20 @@ export function clearHoldings(individualId: string): void {
 // ── Aggregation ─────────────────────────────────────────────────────────────
 
 /**
+ * Normalise a stock name to create a strong grouping key.
+ * Removes common suffixes (ltd, limited, eq), spaces, and special characters.
+ */
+function getStockGroupingKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(ltd\.?|limited|eq|equity)\b/g, '') // remove common suffixes
+    .replace(/&/g, 'and')                           // normalize ampersand
+    .replace(/[^a-z0-9]/g, '');                     // remove spaces and special chars
+}
+
+/**
  * Aggregate holdings across all supplied individuals.
- * Stocks are combined by name (case-insensitive).
+ * Stocks are combined by name using a strong grouping key to handle variations.
  * Results are sorted by totalValue descending.
  */
 export function getAggregatedHoldings(individuals: Individual[]): AggregatedHolding[] {
@@ -176,12 +188,20 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
 
     for (const individual of individuals) {
       for (const h of individual.holdings) {
-        const key = h.stockName.trim().toLowerCase();
-        const existing = map.get(key);
+        const key = getStockGroupingKey(h.stockName);
+        
+        // If key is empty after strip (unlikely), fallback to original string
+        const finalKey = key || h.stockName.toLowerCase().trim();
+        
+        const existing = map.get(finalKey);
         if (existing) {
           existing.totalValue += h.currentValue;
+          // Keep the shorter/cleaner display name if possible
+          if (h.stockName.length < existing.displayName.length && h.stockName.length > 3) {
+            existing.displayName = h.stockName.trim();
+          }
         } else {
-          map.set(key, { displayName: h.stockName.trim(), totalValue: h.currentValue });
+          map.set(finalKey, { displayName: h.stockName.trim(), totalValue: h.currentValue });
         }
       }
     }
