@@ -40,36 +40,54 @@ export interface AggregatedHolding {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Normalise a stock name to create a strong grouping key.
- * Removes common suffixes (ltd, limited, eq), spaces, and special characters.
+ * Compare two stock names and return true if they are structurally identical
+ * or if they share the exact same first two words (after cleaning suffixes).
  */
-export function getStockGroupingKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\b(ltd\.?|limited|limite|eq|equity|tech|technology|technologies|ind|india)\b/g, '') // remove common suffixes
-    .replace(/&/g, 'and')                           // normalize ampersand
-    .replace(/[^a-z0-9]/g, '');                     // remove spaces and special chars
+export function areStocksSame(nameA: string, nameB: string): boolean {
+  const getWords = (name: string) => {
+    let cleaned = name.toLowerCase().replace(/&/g, 'and');
+    // Remove common non-distinguishing suffixes/words BEFORE word splitting
+    cleaned = cleaned.replace(/\b(ltd\.?|limited|limite|eq|equity|tech|technology|technologies|ind|india|forging|precision)\b/g, ' ');
+    return cleaned.split(/\s+/).filter(w => w.length > 0).map(w => w.replace(/[^a-z0-9]/g, ''));
+  };
+
+  const wordsA = getWords(nameA);
+  const wordsB = getWords(nameB);
+  const strA = wordsA.join('');
+  const strB = wordsB.join('');
+
+  if (!strA || !strB) return false;
+  
+  // Exact match of the entire stripped string
+  if (strA === strB) return true;
+
+  // If both have at least 2 words, check if the first two match exactly
+  if (wordsA.length >= 2 && wordsB.length >= 2) {
+    if (wordsA[0] === wordsB[0] && wordsA[1] === wordsB[1]) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
- * Combine duplicate holdings using the strong grouping key.
+ * Combine duplicate holdings using the strong grouping logic.
  */
 export function combineHoldingsList(holdings: HoldingEntry[]): HoldingEntry[] {
-  const map = new Map<string, HoldingEntry>();
+  const result: HoldingEntry[] = [];
   for (const h of holdings) {
-    const key = getStockGroupingKey(h.stockName);
-    const finalKey = key || h.stockName.toLowerCase().trim();
-    const existing = map.get(finalKey);
+    const existing = result.find(r => areStocksSame(r.stockName, h.stockName));
     if (existing) {
       existing.currentValue += h.currentValue;
       if (h.stockName.length < existing.stockName.length && h.stockName.length > 3) {
         existing.stockName = h.stockName.trim();
       }
     } else {
-      map.set(finalKey, { ...h, stockName: h.stockName.trim() });
+      result.push({ ...h, stockName: h.stockName.trim() });
     }
   }
-  return Array.from(map.values());
+  return result;
 }
 
 function readStore(): Individual[] {
@@ -224,26 +242,19 @@ export function clearHoldings(individualId: string): void {
 
 // (Moving getStockGroupingKey up)
 
-/**
- * Aggregate holdings across all supplied individuals.
- * Stocks are combined by name using a strong grouping key to handle variations.
- * Results are sorted by totalValue descending.
- */
 export function getAggregatedHoldings(individuals: Individual[]): AggregatedHolding[] {
   try {
-    const map = new Map<
-      string,
-      { displayName: string; totalValue: number; breakdown: AggregatedHoldingBreakdown[] }
-    >();
+    const aggregatedList: {
+      groupKey: string;
+      displayName: string;
+      totalValue: number;
+      breakdown: AggregatedHoldingBreakdown[];
+    }[] = [];
 
     for (const individual of individuals) {
       for (const h of individual.holdings) {
-        const key = getStockGroupingKey(h.stockName);
+        const existing = aggregatedList.find(a => areStocksSame(a.displayName, h.stockName));
         
-        // If key is empty after strip (unlikely), fallback to original string
-        const finalKey = key || h.stockName.toLowerCase().trim();
-        
-        const existing = map.get(finalKey);
         if (existing) {
           existing.totalValue += h.currentValue;
           existing.breakdown.push({
@@ -256,7 +267,9 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
             existing.displayName = h.stockName.trim();
           }
         } else {
-          map.set(finalKey, {
+          const newKey = h.stockName.toLowerCase().replace(/[^a-z0-9]/g, '') || Math.random().toString(36).substr(2, 5);
+          aggregatedList.push({
+            groupKey: newKey,
             displayName: h.stockName.trim(),
             totalValue: h.currentValue,
             breakdown: [{
@@ -269,15 +282,15 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
       }
     }
 
-    const grandTotal = Array.from(map.values()).reduce((sum, v) => sum + v.totalValue, 0);
+    const grandTotal = aggregatedList.reduce((sum, v) => sum + v.totalValue, 0);
 
-    return Array.from(map.entries())
-      .map(([groupKey, { displayName, totalValue, breakdown }]) => ({
-        groupKey,
-        stockName: displayName,
-        totalValue,
-        percentOfTotal: grandTotal > 0 ? (totalValue / grandTotal) * 100 : 0,
-        breakdown: breakdown.sort((a, b) => b.holding.currentValue - a.holding.currentValue),
+    return aggregatedList
+      .map(a => ({
+        groupKey: a.groupKey,
+        stockName: a.displayName,
+        totalValue: a.totalValue,
+        percentOfTotal: grandTotal > 0 ? (a.totalValue / grandTotal) * 100 : 0,
+        breakdown: a.breakdown.sort((x, y) => y.holding.currentValue - x.holding.currentValue),
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
   } catch (err) {
