@@ -23,10 +23,18 @@ export interface Individual {
   updatedAt: number;
 }
 
+export interface AggregatedHoldingBreakdown {
+  individualId: string;
+  individualName: string;
+  holding: HoldingEntry;
+}
+
 export interface AggregatedHolding {
+  groupKey: string;
   stockName: string;
   totalValue: number;
   percentOfTotal: number;
+  breakdown: AggregatedHoldingBreakdown[];
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -184,7 +192,10 @@ function getStockGroupingKey(name: string): string {
  */
 export function getAggregatedHoldings(individuals: Individual[]): AggregatedHolding[] {
   try {
-    const map = new Map<string, { displayName: string; totalValue: number }>();
+    const map = new Map<
+      string,
+      { displayName: string; totalValue: number; breakdown: AggregatedHoldingBreakdown[] }
+    >();
 
     for (const individual of individuals) {
       for (const h of individual.holdings) {
@@ -196,23 +207,38 @@ export function getAggregatedHoldings(individuals: Individual[]): AggregatedHold
         const existing = map.get(finalKey);
         if (existing) {
           existing.totalValue += h.currentValue;
+          existing.breakdown.push({
+            individualId: individual.id,
+            individualName: individual.name,
+            holding: h,
+          });
           // Keep the shorter/cleaner display name if possible
           if (h.stockName.length < existing.displayName.length && h.stockName.length > 3) {
             existing.displayName = h.stockName.trim();
           }
         } else {
-          map.set(finalKey, { displayName: h.stockName.trim(), totalValue: h.currentValue });
+          map.set(finalKey, {
+            displayName: h.stockName.trim(),
+            totalValue: h.currentValue,
+            breakdown: [{
+              individualId: individual.id,
+              individualName: individual.name,
+              holding: h,
+            }],
+          });
         }
       }
     }
 
     const grandTotal = Array.from(map.values()).reduce((sum, v) => sum + v.totalValue, 0);
 
-    return Array.from(map.values())
-      .map(({ displayName, totalValue }) => ({
+    return Array.from(map.entries())
+      .map(([groupKey, { displayName, totalValue, breakdown }]) => ({
+        groupKey,
         stockName: displayName,
         totalValue,
         percentOfTotal: grandTotal > 0 ? (totalValue / grandTotal) * 100 : 0,
+        breakdown: breakdown.sort((a, b) => b.holding.currentValue - a.holding.currentValue),
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
   } catch (err) {
